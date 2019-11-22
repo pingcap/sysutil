@@ -1,4 +1,4 @@
-module github.com/pingcap/diagnostics
+module github.com/crazycs520/diagnostics
 
 go 1.13
 
