@@ -3,6 +3,7 @@ package diagnostics
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"time"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
@@ -21,7 +22,6 @@ var singleDevicesLoadInfoFns = []struct {
 	fn   func() (interface{}, error)
 }{
 	{"cpu", "load", getCPULoad},
-	{"cpu", "usage", getCPUUsage},
 	{"mem", "virtual", getVirtualMemStat},
 	{"mem", "swap", getSwapMemStat},
 }
@@ -32,6 +32,7 @@ var multiDevicesLoadInfoFns = []struct {
 	tp string
 	fn func() (map[string]interface{}, error)
 }{
+	{"cpu", getCPUUsage},
 	{"net", getNetIOs},
 	{"disk", getDiskIOs},
 	{"disk", getDiskUsage},
@@ -71,22 +72,27 @@ func getCPULoad() (interface{}, error) {
 	return load.Avg()
 }
 
-func getCPUUsage() (interface{}, error) {
-	usages, err := cpu.Percent(time.Millisecond*100, false)
-	if err != nil {
-		return nil, err
-	}
-	return map[string]interface{}{
-		"cpu_1": usages[0],
-	}, nil
-}
-
 func getVirtualMemStat() (interface{}, error) {
 	return mem.VirtualMemory()
 }
 
 func getSwapMemStat() (interface{}, error) {
 	return mem.SwapMemory()
+}
+
+func getCPUUsage() (map[string]interface{}, error) {
+	usages, err := cpu.Percent(time.Millisecond*100, true)
+	if err != nil {
+		return nil, err
+	}
+	m := make(map[string]interface{}, len(usages))
+	for i,usage := range usages {
+		name := "cpu-" +  strconv.FormatInt(int64(i),10)
+		m[name] = map[string]interface{}{
+			"usage": usage,
+		}
+	}
+	return m,nil
 }
 
 func getNetIOs() (map[string]interface{}, error) {
