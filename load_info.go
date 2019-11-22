@@ -21,7 +21,7 @@ var singleDevicesLoadInfoFns = []struct {
 	name string
 	fn   func() (interface{}, error)
 }{
-	{"cpu", "load", getCPULoad},
+	{"cpu", "cpu", getCPULoad},
 	{"mem", "virtual", getVirtualMemStat},
 	{"mem", "swap", getSwapMemStat},
 }
