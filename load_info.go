@@ -1,6 +1,7 @@
 package diagnostics
 
 import (
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -150,7 +151,7 @@ func convertToServerInfoItems(tp, name string, data interface{}) (*pb.ServerInfo
 	pairs := make([]*pb.ServerInfoPair, 0, len(m))
 	for k, v := range m {
 		pairs = append(pairs, &pb.ServerInfoPair{
-			Key:   k,
+			Key:   convertCamelNameToKebabName(k),
 			Value: fmt.Sprintf("%v", v),
 		})
 	}
@@ -159,4 +160,17 @@ func convertToServerInfoItems(tp, name string, data interface{}) (*pb.ServerInfo
 		Name:  name,
 		Pairs: pairs,
 	}, nil
+}
+
+func convertCamelNameToKebabName(name string) string {
+	var buf bytes.Buffer
+	for _, c := range name {
+		if 'A' <= c && c <= 'Z' {
+			c += 'a' - 'A'
+			buf.WriteByte('-')
+		}
+		buf.WriteByte(byte(c))
+
+	}
+	return buf.String()
 }
