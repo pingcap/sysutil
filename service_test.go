@@ -1,4 +1,4 @@
-package diagnostics
+package sysutil
 
 import (
 	"context"
@@ -6,9 +6,9 @@ import (
 	"net"
 	"testing"
 	"time"
-	"google.golang.org/grpc"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
+	"google.golang.org/grpc"
 )
 
 func TestRPCServerLoadInfo(t *testing.T) {

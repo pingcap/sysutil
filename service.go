@@ -1,4 +1,4 @@
-package diagnostics
+package sysutil
 
 import (
 	"context"
