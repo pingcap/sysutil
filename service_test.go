@@ -11,54 +11,69 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package sysutil
+package sysutil_test
 
 import (
 	"context"
+	"fmt"
 	"log"
 	"net"
 	"testing"
 	"time"
 
+	. "github.com/pingcap/check"
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
+	"github.com/pingcap/sysutil"
 	"google.golang.org/grpc"
 )
 
-func TestRPCServerLoadInfo(t *testing.T) {
-	address := "127.0.0.1:10080"
-	setUpService(address)
+type serviceSuite struct {
+	server  *grpc.Server
+	address string
+}
 
+var _ = Suite(&serviceSuite{})
+
+func TestT(t *testing.T) {
+	TestingT(t)
+}
+
+func (s *serviceSuite) SetUpSuite(c *C) {
+	server := grpc.NewServer()
+	pb.RegisterDiagnosticsServer(server, &sysutil.DiagnoseServer{})
+
+	// Find a available port
+	listener, err := net.Listen("tcp", ":0")
+	c.Assert(err, IsNil, Commentf("cannot find available port"))
+
+	s.server = server
+	s.address = fmt.Sprintf(":%d", listener.Addr().(*net.TCPAddr).Port)
+
+	go func() {
+		if err := server.Serve(listener); err != nil {
+			log.Fatalf("failed to serve: %v", err)
+		}
+	}()
+}
+
+func (s *serviceSuite) TearDownSuite(c *C) {
+	s.server.Stop()
+}
+
+func (s *serviceSuite) TestRPCServerLoadInfo(c *C) {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(address, grpc.WithInsecure())
-	if err != nil {
-		t.Fatal(err)
-	}
+	conn, err := grpc.Dial(s.address, grpc.WithInsecure())
+	c.Assert(err, IsNil)
+
 	defer conn.Close()
-	c := pb.NewDiagnosticsClient(conn)
+	client := pb.NewDiagnosticsClient(conn)
 
 	// Contact the server and print out its response.
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
-	r, err := c.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_LoadInfo})
-	if err != nil {
-		t.Fatal(err)
-	}
-	if r == nil || len(r.Items) == 0 {
-		t.Fatal()
-	}
-	return
-}
 
-func setUpService(addr string) {
-	go func() {
-		lis, err := net.Listen("tcp", addr)
-		if err != nil {
-			log.Fatalf("failed to listen: %v", err)
-		}
-		s := grpc.NewServer()
-		pb.RegisterDiagnosticsServer(s, &DiagnoseServer{})
-		if err := s.Serve(lis); err != nil {
-			log.Fatalf("failed to serve: %v", err)
-		}
-	}()
+	r, err := client.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_LoadInfo})
+	c.Assert(err, IsNil)
+	c.Assert(r, NotNil)
+	c.Assert(len(r.Items), Not(Equals), 0)
 }
