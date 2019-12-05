@@ -1,0 +1,13 @@
+bin
+coverage.out
+.idea/
+*.iml
+*.swp
+*.log
+tags
+profile.coverprofile
+*.fail.go
+tools/bin/
+vendor
+/_tools/
+.DS_Store
