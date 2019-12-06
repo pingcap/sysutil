@@ -15,20 +15,71 @@ package sysutil
 
 import (
 	"context"
+	"io"
+	"math"
+	"os"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 )
 
-type DiagnoseServer struct {
+type DiagnosticsServer struct {
+	logFile string
+}
+
+func NewDiagnosticsServer(logFile string) *DiagnosticsServer {
+	return &DiagnosticsServer{
+		logFile: logFile,
+	}
 }
 
 // SearchLog implements the DiagnosticsServer interface.
-func (d *DiagnoseServer) SearchLog(context.Context, *pb.SearchLogRequest) (*pb.SearchLogResponse, error) {
-	panic("unimplemented")
+func (d *DiagnosticsServer) SearchLog(_ context.Context, req *pb.SearchLogRequest) (*pb.SearchLogResponse, error) {
+	beginTime := req.StartTime
+	endTime := req.EndTime
+	if endTime == 0 {
+		endTime = math.MaxInt64
+	}
+
+	logFiles, err := resolveFiles(d.logFile, beginTime, endTime)
+	if err != nil {
+		return nil, err
+	}
+
+	// Sort log files by start time
+	var searchFiles []*os.File
+	for _, f := range logFiles {
+		searchFiles = append(searchFiles, f.file)
+	}
+	iter := logIterator{
+		begin:   req.GetStartTime(),
+		end:     req.GetEndTime(),
+		level:   req.GetLevel(),
+		pattern: req.GetPattern(),
+		pending: searchFiles,
+	}
+	defer iter.close()
+
+	limit := req.GetLimit()
+	if limit <= 0 {
+		limit = 64 * 1025
+	}
+
+	var messages []*pb.LogMessage
+	for i := int64(0); i < limit; i++ {
+		item, err := iter.next()
+		if err != nil && err == io.EOF {
+			break
+		}
+		if err != nil {
+			return nil, err
+		}
+		messages = append(messages, item)
+	}
+	return &pb.SearchLogResponse{Messages: messages}, nil
 }
 
 // ServerInfo implements the DiagnosticsServer interface.
-func (d *DiagnoseServer) ServerInfo(ctx context.Context, req *pb.ServerInfoRequest) (*pb.ServerInfoResponse, error) {
+func (d *DiagnosticsServer) ServerInfo(ctx context.Context, req *pb.ServerInfoRequest) (*pb.ServerInfoResponse, error) {
 	var items []*pb.ServerInfoItem
 	var err error
 	switch req.Tp {
