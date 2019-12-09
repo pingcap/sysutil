@@ -85,6 +85,10 @@ func (d *DiagnosticsServer) ServerInfo(ctx context.Context, req *pb.ServerInfoRe
 	switch req.Tp {
 	case pb.ServerInfoType_LoadInfo:
 		items, err = getLoadInfo()
+	case pb.ServerInfoType_HardwareInfo:
+		items, err = getHardwareInfo()
+	case pb.ServerInfoType_SystemInfo:
+		items, err = getSystemInfo()
 	}
 	if err != nil {
 		return nil, err

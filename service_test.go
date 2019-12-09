@@ -60,7 +60,7 @@ func (s *serviceSuite) TearDownSuite(c *C) {
 	s.server.Stop()
 }
 
-func (s *serviceSuite) TestRPCServerLoadInfo(c *C) {
+func (s *serviceSuite) TestRPCServerInfo(c *C) {
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(s.address, grpc.WithInsecure())
 	c.Assert(err, IsNil)
@@ -72,8 +72,28 @@ func (s *serviceSuite) TestRPCServerLoadInfo(c *C) {
 	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
 	defer cancel()
 
+	// Test for load info.
 	r, err := client.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_LoadInfo})
 	c.Assert(err, IsNil)
 	c.Assert(r, NotNil)
 	c.Assert(len(r.Items), Not(Equals), 0)
+
+	// Test for hardware info.
+	r, err = client.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_HardwareInfo})
+	c.Assert(err, IsNil)
+	c.Assert(r, NotNil)
+	c.Assert(len(r.Items), Not(Equals), 0)
+
+	// Test for system info.
+	r, err = client.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_SystemInfo})
+	c.Assert(err, IsNil)
+	c.Assert(r, NotNil)
+	c.Assert(len(r.Items), Not(Equals), 0)
+
+	for _, item := range r.Items {
+		for _, p := range item.Pairs {
+			fmt.Printf("%v, %v, %v, %v\n", item.Tp, item.Name, p.Key, p.Value)
+			_ = p
+		}
+	}
 }
