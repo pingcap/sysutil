@@ -101,7 +101,7 @@ func getCPUUsage() (map[string]interface{}, error) {
 	}
 	m := make(map[string]interface{}, len(usages))
 	for i, usage := range usages {
-		name := "cpu-" + strconv.FormatInt(int64(i), 10)
+		name := "cpu" + strconv.FormatInt(int64(i), 10)
 		m[name] = map[string]interface{}{
 			"usage": usage,
 		}
