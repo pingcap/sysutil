@@ -10,8 +10,6 @@ import (
 	"github.com/shirou/gopsutil/net"
 )
 
-// singleDevicesLoadInfoFns is the slice of single device load info functions.
-// Such as cpu, memory.
 var singleDevicesHardwareInfoFns = []struct {
 	tp   string
 	name string
@@ -21,8 +19,6 @@ var singleDevicesHardwareInfoFns = []struct {
 	{"mem", "virtual", getVirtualMemStat},
 }
 
-// multiDevicesLoadInfoFns is the slice of multi-device load info functions.
-// Such as disk, network card.
 var multiDevicesHardInfoInfoFns = []struct {
 	tp string
 	fn func() (map[string]interface{}, error)

@@ -23,7 +23,7 @@ func getSysctl() ([]*pb.ServerInfoItem, error) {
 	}
 	buf := bytes.NewBuffer(out)
 	reader := bufio.NewReader(buf)
-	m := make(map[string]string)
+	pairs := make([]*pb.ServerInfoPair, 0, 2048)
 	for {
 		l, _, err := reader.ReadLine()
 		if err != nil {
@@ -34,17 +34,14 @@ func getSysctl() ([]*pb.ServerInfoItem, error) {
 		}
 		kv := strings.Split(string(l), ":")
 		if len(kv) >= 2 {
-			m[kv[0]] = strings.TrimSpace(kv[1])
+			pairs = append(pairs, &pb.ServerInfoPair{
+				Key:   kv[0],
+				Value: strings.TrimSpace(kv[1]),
+			})
+
 		}
 	}
 	items := make([]*pb.ServerInfoItem, 0, len(singleDevicesLoadInfoFns))
-	pairs := make([]*pb.ServerInfoPair, 0, len(m))
-	for k, v := range m {
-		pairs = append(pairs, &pb.ServerInfoPair{
-			Key:   k,
-			Value: v,
-		})
-	}
 	items = append(items, &pb.ServerInfoItem{
 		Tp:    "system",
 		Name:  "sysctl",
