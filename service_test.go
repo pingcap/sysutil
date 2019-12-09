@@ -40,7 +40,7 @@ func TestT(t *testing.T) {
 
 func (s *serviceSuite) SetUpSuite(c *C) {
 	server := grpc.NewServer()
-	pb.RegisterDiagnosticsServer(server, &sysutil.DiagnoseServer{})
+	pb.RegisterDiagnosticsServer(server, &sysutil.DiagnosticsServer{})
 
 	// Find a available port
 	listener, err := net.Listen("tcp", ":0")
