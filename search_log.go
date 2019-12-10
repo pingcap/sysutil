@@ -229,10 +229,10 @@ const SEEK_THRESHOLD = 1024 * 1024
 // time.
 type logIterator struct {
 	// filters
-	begin   int64
-	end     int64
-	level   pb.LogLevel
-	pattern string
+	begin     int64
+	end       int64
+	levelFlag int64
+	pattern   string
 
 	// inner state
 	fileIndex int
@@ -281,7 +281,7 @@ func (iter *logIterator) next() (*pb.LogMessage, error) {
 		if item.Time < iter.begin {
 			continue
 		}
-		if iter.level != pb.LogLevel_ALL && item.Level != iter.level {
+		if iter.levelFlag != 0 && iter.levelFlag&(1<<item.Level) == 0 {
 			continue
 		}
 		// TODO: do we need to support regular expression search
