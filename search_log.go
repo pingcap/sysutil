@@ -159,7 +159,7 @@ func readLastLine(file *os.File) string {
 
 // Returns LogLevel from string and return LogLevel_Info if
 // the string is an invalid level string
-func parseLogLevel(s string) pb.LogLevel {
+func ParseLogLevel(s string) pb.LogLevel {
 	switch s {
 	case "debug", "DEBUG":
 		return pb.LogLevel_Debug
@@ -199,7 +199,7 @@ func parseLogItem(s string) (*pb.LogMessage, error) {
 	}
 	levelLeftBound := strings.Index(s[timeRightBound+1:], "[")
 	levelRightBound := strings.Index(s[timeRightBound+1:], "]")
-	level := parseLogLevel(s[timeRightBound+1+levelLeftBound+1 : timeRightBound+1+levelRightBound])
+	level := ParseLogLevel(s[timeRightBound+1+levelLeftBound+1 : timeRightBound+1+levelRightBound])
 	item := &pb.LogMessage{
 		Time:    time,
 		Level:   level,
