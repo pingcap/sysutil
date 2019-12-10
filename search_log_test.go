@@ -16,6 +16,7 @@ package sysutil_test
 import (
 	"context"
 	"fmt"
+	"io"
 	"io/ioutil"
 	"log"
 	"net"
@@ -241,7 +242,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	cases := []struct {
 		search  timeRange
 		expect  []string
-		level   pb.LogLevel
+		levels  []pb.LogLevel
 		pattern string
 	}{
 		// 0
@@ -352,7 +353,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		// 8
 		{
 			search: timeRange{"2019/08/26 06:19:15.011 -04:00", "2019/08/26 06:22:14.011 -04:00"},
-			level:  pb.LogLevel_Debug,
+			levels: []pb.LogLevel{pb.LogLevel_Debug},
 			expect: []string{
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 			},
@@ -360,7 +361,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		// 9
 		{
 			search: timeRange{"2019/08/26 06:19:15.011 -04:00", "2019/08/26 06:22:14.011 -04:00"},
-			level:  pb.LogLevel_Trace,
+			levels: []pb.LogLevel{pb.LogLevel_Trace},
 			expect: []string{
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 			},
@@ -368,7 +369,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		// 10
 		{
 			search: timeRange{"2019/08/26 06:19:15.011 -04:00", "2019/08/26 06:22:14.011 -04:00"},
-			level:  pb.LogLevel_Info,
+			levels: []pb.LogLevel{pb.LogLevel_Info},
 			expect: []string{
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -378,7 +379,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		// 11
 		{
 			search: timeRange{"2019/08/26 06:19:15.011 -04:00", "2019/08/26 06:22:14.011 -04:00"},
-			level:  pb.LogLevel_Warn,
+			levels: []pb.LogLevel{pb.LogLevel_Warn},
 			expect: []string{
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
@@ -387,7 +388,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		// 12
 		{
 			search: timeRange{"2019/08/26 06:19:14.011 -04:00", "2019/08/26 06:19:16.012 -04:00"},
-			level:  pb.LogLevel_Error,
+			levels: []pb.LogLevel{pb.LogLevel_Error},
 			expect: []string{
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 			},
@@ -395,7 +396,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		// 13
 		{
 			search:  timeRange{"2019/08/26 06:19:14.011 -04:00", "2019/08/26 06:23:17.011 -04:00"},
-			level:   pb.LogLevel_Info,
+			levels:  []pb.LogLevel{pb.LogLevel_Info},
 			pattern: "partern",
 			expect: []string{
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
@@ -408,11 +409,6 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	c.Assert(err, IsNil)
 
 	defer conn.Close()
-	client := pb.NewDiagnosticsClient(conn)
-
-	// Contact the server and print out its response.
-	ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-	defer cancel()
 
 	for i, cas := range cases {
 		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
@@ -422,11 +418,26 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		req := &pb.SearchLogRequest{
 			StartTime: beginTime,
 			EndTime:   endTime,
-			Level:     cas.level,
+			Levels:    cas.levels,
 			Pattern:   cas.pattern,
 		}
-		resp, err := client.SearchLog(ctx, req)
+		client := pb.NewDiagnosticsClient(conn)
+
+		// Contact the server and print out its response.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		stream, err := client.SearchLog(ctx, req)
 		c.Assert(err, IsNil)
+
+		resp := &pb.SearchLogResponse{}
+		for {
+			res, err := stream.Recv()
+			if err != nil && err == io.EOF {
+				break
+			}
+			resp.Messages = append(resp.Messages, res.Messages...)
+		}
 
 		var items []*pb.LogMessage
 		for _, s := range cas.expect {

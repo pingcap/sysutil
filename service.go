@@ -33,7 +33,7 @@ func NewDiagnosticsServer(logFile string) *DiagnosticsServer {
 }
 
 // SearchLog implements the DiagnosticsServer interface.
-func (d *DiagnosticsServer) SearchLog(_ context.Context, req *pb.SearchLogRequest) (*pb.SearchLogResponse, error) {
+func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagnostics_SearchLogServer) error {
 	beginTime := req.StartTime
 	endTime := req.EndTime
 	if endTime == 0 {
@@ -42,7 +42,7 @@ func (d *DiagnosticsServer) SearchLog(_ context.Context, req *pb.SearchLogReques
 
 	logFiles, err := resolveFiles(d.logFile, beginTime, endTime)
 	if err != nil {
-		return nil, err
+		return err
 	}
 
 	// Sort log files by start time
@@ -50,32 +50,44 @@ func (d *DiagnosticsServer) SearchLog(_ context.Context, req *pb.SearchLogReques
 	for _, f := range logFiles {
 		searchFiles = append(searchFiles, f.file)
 	}
+	var levelFlag int64
+	for _, l := range req.Levels {
+		levelFlag |= 1 << l
+	}
 	iter := logIterator{
-		begin:   req.GetStartTime(),
-		end:     req.GetEndTime(),
-		level:   req.GetLevel(),
-		pattern: req.GetPattern(),
-		pending: searchFiles,
+		begin:     req.StartTime,
+		end:       req.EndTime,
+		levelFlag: levelFlag,
+		pattern:   req.Pattern,
+		pending:   searchFiles,
 	}
 	defer iter.close()
 
-	limit := req.GetLimit()
-	if limit <= 0 {
-		limit = 64 * 1025
-	}
-
-	var messages []*pb.LogMessage
-	for i := int64(0); i < limit; i++ {
-		item, err := iter.next()
-		if err != nil && err == io.EOF {
+	for {
+		var messages []*pb.LogMessage
+		var drained bool
+		for i := 0; i < 1024; i++ {
+			item, err := iter.next()
+			if err != nil && err == io.EOF {
+				drained = true
+				break
+			}
+			if err != nil {
+				return err
+			}
+			messages = append(messages, item)
+		}
+		res := &pb.SearchLogResponse{
+			Messages: messages,
+		}
+		if err := stream.Send(res); err != nil {
+			return err
+		}
+		if drained {
 			break
 		}
-		if err != nil {
-			return nil, err
-		}
-		messages = append(messages, item)
 	}
-	return &pb.SearchLogResponse{Messages: messages}, nil
+	return nil
 }
 
 // ServerInfo implements the DiagnosticsServer interface.
