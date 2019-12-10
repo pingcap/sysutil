@@ -15,7 +15,6 @@ package sysutil
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"math"
 	"os"
