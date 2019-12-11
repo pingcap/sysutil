@@ -64,8 +64,8 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 		patterns = append(patterns, re)
 	}
 	iter := logIterator{
-		begin:     req.StartTime,
-		end:       req.EndTime,
+		begin:     beginTime,
+		end:       endTime,
 		levelFlag: levelFlag,
 		patterns:  patterns,
 		pending:   searchFiles,
