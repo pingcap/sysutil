@@ -18,6 +18,7 @@ import (
 	"io"
 	"math"
 	"os"
+	"regexp"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 )
@@ -54,11 +55,19 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 	for _, l := range req.Levels {
 		levelFlag |= 1 << l
 	}
+	var patterns []*regexp.Regexp
+	for _, p := range req.Patterns {
+		re, err := regexp.Compile(p)
+		if err != nil {
+			return err
+		}
+		patterns = append(patterns, re)
+	}
 	iter := logIterator{
 		begin:     req.StartTime,
 		end:       req.EndTime,
 		levelFlag: levelFlag,
-		pattern:   req.Pattern,
+		patterns:  patterns,
 		pending:   searchFiles,
 	}
 	defer iter.close()

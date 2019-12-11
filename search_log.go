@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"regexp"
 	"sort"
 	"strings"
 	"time"
@@ -174,7 +175,7 @@ func ParseLogLevel(s string) pb.LogLevel {
 	case "error", "ERROR":
 		return pb.LogLevel_Error
 	default:
-		return pb.LogLevel_Info
+		return pb.LogLevel_UNKNOWN
 	}
 }
 
@@ -232,7 +233,7 @@ type logIterator struct {
 	begin     int64
 	end       int64
 	levelFlag int64
-	pattern   string
+	patterns  []*regexp.Regexp
 
 	// inner state
 	fileIndex int
@@ -256,6 +257,7 @@ func (iter *logIterator) next() (*pb.LogMessage, error) {
 		iter.reader = bufio.NewReader(iter.pending[iter.fileIndex])
 	}
 
+nextLine:
 	for {
 		line, err := readLine(iter.reader)
 		// Switch to next log file
@@ -284,9 +286,12 @@ func (iter *logIterator) next() (*pb.LogMessage, error) {
 		if iter.levelFlag != 0 && iter.levelFlag&(1<<item.Level) == 0 {
 			continue
 		}
-		// TODO: do we need to support regular expression search
-		if len(iter.pattern) > 0 && !strings.Contains(item.Message, iter.pattern) {
-			continue
+		if len(iter.patterns) > 0 {
+			for _, p := range iter.patterns {
+				if !p.MatchString(item.Message) {
+					continue nextLine
+				}
+			}
 		}
 		return item, nil
 	}
