@@ -234,16 +234,17 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	})
 	s.writeTmpFile(c, "rpc.tidb.log.5", []string{
 		`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
+		`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 	})
 
 	type timeRange struct{ start, end string }
 
 	// filter by time range
 	cases := []struct {
-		search  timeRange
-		expect  []string
-		levels  []pb.LogLevel
-		pattern string
+		search   timeRange
+		expect   []string
+		levels   []pb.LogLevel
+		patterns []string
 	}{
 		// 0
 		{
@@ -282,6 +283,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
+				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 			},
 		},
 		// 2
@@ -308,6 +310,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
+				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 			},
 		},
 		// 4
@@ -395,11 +398,21 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		},
 		// 13
 		{
-			search:  timeRange{"2019/08/26 06:19:14.011 -04:00", "2019/08/26 06:23:17.011 -04:00"},
-			levels:  []pb.LogLevel{pb.LogLevel_Info},
-			pattern: "partern",
+			search:   timeRange{"2019/08/26 06:19:14.011 -04:00", "2019/08/27 06:23:17.011 -04:00"},
+			levels:   []pb.LogLevel{pb.LogLevel_Info},
+			patterns: []string{".*partern.*"},
 			expect: []string{
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
+				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
+			},
+		},
+		// 14
+		{
+			search:   timeRange{"2019/08/26 06:19:14.011 -04:00", "2019/08/27 06:23:17.011 -04:00"},
+			levels:   []pb.LogLevel{pb.LogLevel_Info},
+			patterns: []string{".*partern.*", ".*txn.*"},
+			expect: []string{
+				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 			},
 		},
 	}
@@ -419,7 +432,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			StartTime: beginTime,
 			EndTime:   endTime,
 			Levels:    cas.levels,
-			Pattern:   cas.pattern,
+			Patterns:  cas.patterns,
 		}
 		client := pb.NewDiagnosticsClient(conn)
 
@@ -436,6 +449,8 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			if err != nil && err == io.EOF {
 				break
 			}
+			c.Assert(err, IsNil)
+			c.Assert(res, NotNil)
 			resp.Messages = append(resp.Messages, res.Messages...)
 		}
 
@@ -467,7 +482,7 @@ func (s *searchLogSuite) TestParseLogLevel(c *C) {
 		{"CRITICAL", pb.LogLevel_Critical},
 		{"error", pb.LogLevel_Error},
 		{"ERROR", pb.LogLevel_Error},
-		{"invalid", pb.LogLevel_Info},
+		{"invalid", pb.LogLevel_UNKNOWN},
 	}
 
 	for _, cas := range cases {
