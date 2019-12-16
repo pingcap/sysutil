@@ -52,34 +52,34 @@ var multiDevicesLoadInfoFns = []struct {
 	{"disk", getDiskUsage},
 }
 
-func getLoadInfo() ([]*pb.ServerInfoItem, error) {
+func getLoadInfo() []*pb.ServerInfoItem {
 	items := make([]*pb.ServerInfoItem, 0, len(singleDevicesLoadInfoFns))
 	for _, f := range singleDevicesLoadInfoFns {
 		data, err := f.fn()
 		if err != nil {
-			return nil, err
+			continue
 		}
 		item, err := convertToServerInfoItems(f.tp, f.name, data)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		items = append(items, item)
 	}
 	for _, f := range multiDevicesLoadInfoFns {
 		ds, err := f.fn()
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		for k, data := range ds {
 			item, err := convertToServerInfoItems(f.tp, k, data)
 			if err != nil {
-				return nil, err
+				continue
 			}
 			items = append(items, item)
 		}
 	}
-	return items, nil
+	return items
 }
 
 func getCPULoad() (interface{}, error) {

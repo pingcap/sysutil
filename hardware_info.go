@@ -28,34 +28,34 @@ var multiDevicesHardInfoInfoFns = []struct {
 	{"disk", getDisk},
 }
 
-func getHardwareInfo() ([]*pb.ServerInfoItem, error) {
+func getHardwareInfo() []*pb.ServerInfoItem {
 	items := make([]*pb.ServerInfoItem, 0, len(singleDevicesLoadInfoFns))
 	for _, f := range singleDevicesHardwareInfoFns {
 		data, err := f.fn()
 		if err != nil {
-			return nil, err
+			continue
 		}
 		item, err := convertToServerInfoItems(f.tp, f.name, data)
 		if err != nil {
-			return nil, err
+			continue
 		}
 		items = append(items, item)
 	}
 	for _, f := range multiDevicesHardInfoInfoFns {
 		ds, err := f.fn()
 		if err != nil {
-			return nil, err
+			continue
 		}
 
 		for k, data := range ds {
 			item, err := convertToServerInfoItems(f.tp, k, data)
 			if err != nil {
-				return nil, err
+				continue
 			}
 			items = append(items, item)
 		}
 	}
-	return items, nil
+	return items
 }
 
 func getCPU() (map[string]interface{}, error) {
