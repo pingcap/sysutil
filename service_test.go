@@ -89,11 +89,4 @@ func (s *serviceSuite) TestRPCServerInfo(c *C) {
 	c.Assert(err, IsNil)
 	c.Assert(r, NotNil)
 	c.Assert(len(r.Items), Not(Equals), 0)
-
-	for _, item := range r.Items {
-		for _, p := range item.Pairs {
-			fmt.Printf("%v, %v, %v, %v\n", item.Tp, item.Name, p.Key, p.Value)
-			_ = p
-		}
-	}
 }

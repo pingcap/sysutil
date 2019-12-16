@@ -4,22 +4,21 @@ import (
 	"bufio"
 	"bytes"
 	"io"
-	"log"
 	"os/exec"
 	"strings"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 )
 
-func getSystemInfo() ([]*pb.ServerInfoItem, error) {
+func getSystemInfo() []*pb.ServerInfoItem {
 	return getSysctl()
 }
 
-func getSysctl() ([]*pb.ServerInfoItem, error) {
+func getSysctl() []*pb.ServerInfoItem {
 	cmd := exec.Command("sysctl", "-a")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("cmd.Run() failed with %s\n", err)
+		return nil
 	}
 	buf := bytes.NewBuffer(out)
 	reader := bufio.NewReader(buf)
@@ -30,7 +29,7 @@ func getSysctl() ([]*pb.ServerInfoItem, error) {
 			if err == io.EOF {
 				break
 			}
-			return nil, err
+			return nil
 		}
 		kv := strings.Split(string(l), ":")
 		if len(kv) >= 2 {
@@ -47,5 +46,5 @@ func getSysctl() ([]*pb.ServerInfoItem, error) {
 		Name:  "sysctl",
 		Pairs: pairs,
 	})
-	return items, nil
+	return items
 }

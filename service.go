@@ -102,17 +102,13 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 // ServerInfo implements the DiagnosticsServer interface.
 func (d *DiagnosticsServer) ServerInfo(ctx context.Context, req *pb.ServerInfoRequest) (*pb.ServerInfoResponse, error) {
 	var items []*pb.ServerInfoItem
-	var err error
 	switch req.Tp {
 	case pb.ServerInfoType_LoadInfo:
-		items, err = getLoadInfo()
+		items = getLoadInfo()
 	case pb.ServerInfoType_HardwareInfo:
-		items, err = getHardwareInfo()
+		items = getHardwareInfo()
 	case pb.ServerInfoType_SystemInfo:
-		items, err = getSystemInfo()
-	}
-	if err != nil {
-		return nil, err
+		items = getSystemInfo()
 	}
 	return &pb.ServerInfoResponse{Items: items}, nil
 }
