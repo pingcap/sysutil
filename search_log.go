@@ -58,8 +58,11 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		if info.IsDir() {
 			return nil
 		}
-		// All rotated log files have the same prefix with the original file
+		// All rotated log files have the same prefix and extension with the original file
 		if !strings.HasPrefix(path, filePrefix) {
+			return nil
+		}
+		if !strings.HasSuffix(path, ext) {
 			return nil
 		}
 		// If we cannot open the file, we skip to search the file instead of returning
