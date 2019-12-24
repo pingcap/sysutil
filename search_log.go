@@ -49,6 +49,8 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 	var logFiles []logFile
 	var skipFiles []*os.File
 	logDir := filepath.Dir(logFilePath)
+	ext := filepath.Ext(logFilePath)
+	filePrefix := logFilePath[:len(logFilePath)-len(ext)]
 	err := filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -57,7 +59,7 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 			return nil
 		}
 		// All rotated log files have the same prefix with the original file
-		if !strings.HasPrefix(path, logFilePath) {
+		if !strings.HasPrefix(path, filePrefix) {
 			return nil
 		}
 		// If we cannot open the file, we skip to search the file instead of returning

@@ -81,19 +81,19 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 	})
 
 	// single line file
-	s.writeTmpFile(c, "tidb.log.1", []string{
+	s.writeTmpFile(c, "tidb-1.log", []string{
 		`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// two lines file
-	s.writeTmpFile(c, "tidb.log.2", []string{
+	s.writeTmpFile(c, "tidb-2.log", []string{
 		`[2019/08/26 06:21:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// empty file
-	s.writeTmpFile(c, "tidb.log.3", []string{``})
-	s.writeTmpFile(c, "tidb.log.4", []string{
+	s.writeTmpFile(c, "tidb-3.log", []string{``})
+	s.writeTmpFile(c, "tidb-4.log", []string{
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -213,26 +213,26 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	})
 
 	// single line file
-	s.writeTmpFile(c, "rpc.tidb.log.1", []string{
+	s.writeTmpFile(c, "rpc.tidb-1.log", []string{
 		`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// two lines file
-	s.writeTmpFile(c, "rpc.tidb.log.2", []string{
+	s.writeTmpFile(c, "rpc.tidb-2.log", []string{
 		`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// empty file
-	s.writeTmpFile(c, "rpc.tidb.log.3", []string{``})
-	s.writeTmpFile(c, "rpc.tidb.log.4", []string{
+	s.writeTmpFile(c, "rpc.tidb-3.log", []string{``})
+	s.writeTmpFile(c, "rpc.tidb-4.log", []string{
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 	})
-	s.writeTmpFile(c, "rpc.tidb.log.5", []string{
+	s.writeTmpFile(c, "rpc.tidb-5.log", []string{
 		`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
 		`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 	})
