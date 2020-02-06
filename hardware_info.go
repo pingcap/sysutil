@@ -1,100 +1,101 @@
 package sysutil
 
 import (
-	"strconv"
+	"fmt"
+	"runtime"
+	"strings"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/shirou/gopsutil/cpu"
 	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/host"
+	"github.com/shirou/gopsutil/mem"
 	"github.com/shirou/gopsutil/net"
 )
 
-var singleDevicesHardwareInfoFns = []struct {
-	tp   string
-	name string
-	fn   func() (interface{}, error)
-}{
-	{"host", "host", getHost},
-	{"mem", "virtual", getVirtualMemStat},
-}
-
-var multiDevicesHardInfoInfoFns = []struct {
-	tp string
-	fn func() (map[string]interface{}, error)
-}{
-	{"cpu", getCPU},
-	{"net", getNet},
-	{"disk", getDisk},
-}
-
 func getHardwareInfo() []*pb.ServerInfoItem {
-	items := make([]*pb.ServerInfoItem, 0, len(singleDevicesLoadInfoFns))
-	for _, f := range singleDevicesHardwareInfoFns {
-		data, err := f.fn()
-		if err != nil {
-			continue
-		}
-		item, err := convertToServerInfoItems(f.tp, f.name, data)
-		if err != nil {
-			continue
-		}
-		items = append(items, item)
+	var results []*pb.ServerInfoItem
+	// cpu
+	infos, err := cpu.Info()
+	if err == nil && len(infos) > 0 {
+		results = append(results, &pb.ServerInfoItem{
+			Tp:   "cpu",
+			Name: "cpu",
+			Pairs: []*pb.ServerInfoPair{
+				{Key: "cpu-logical-cores", Value: fmt.Sprintf("%d", runtime.NumCPU())},
+				{Key: "cpu-physical-cores", Value: fmt.Sprintf("%d", infos[0].Cores)},
+				{Key: "cpu-frequency", Value: fmt.Sprintf("%.2fMHz", infos[0].Mhz)},
+				{Key: "cache", Value: fmt.Sprintf("%d", infos[0].CacheSize)},
+			},
+		})
 	}
-	for _, f := range multiDevicesHardInfoInfoFns {
-		ds, err := f.fn()
-		if err != nil {
-			continue
-		}
 
-		for k, data := range ds {
-			item, err := convertToServerInfoItems(f.tp, k, data)
+	// memory
+	ms, err := mem.VirtualMemory()
+	if err == nil {
+		results = append(results, &pb.ServerInfoItem{
+			Tp:   "memory",
+			Name: "memory",
+			Pairs: []*pb.ServerInfoPair{
+				{Key: "capacity", Value: fmt.Sprintf("%d", ms.Total)},
+			},
+		})
+	}
+
+	// disk
+	parts, err := disk.Partitions(true)
+	if err == nil && len(parts) > 0 {
+		for _, p := range parts {
+			usage, err := disk.Usage(p.Mountpoint)
 			if err != nil {
 				continue
 			}
-			items = append(items, item)
+			results = append(results, &pb.ServerInfoItem{
+				Tp:   "disk",
+				Name: p.Device,
+				Pairs: []*pb.ServerInfoPair{
+					{Key: "fstype", Value: p.Fstype},
+					{Key: "opts", Value: p.Opts},
+					{Key: "path", Value: p.Mountpoint},
+					{Key: "total", Value: fmt.Sprintf("%d", usage.Total)},
+					{Key: "free", Value: fmt.Sprintf("%d", usage.Free)},
+					{Key: "used", Value: fmt.Sprintf("%d", usage.Used)},
+					{Key: "free-percent", Value: fmt.Sprintf("%.2f", 1-usage.UsedPercent)},
+					{Key: "used-percent", Value: fmt.Sprintf("%.2f", usage.UsedPercent)},
+				},
+			})
 		}
 	}
-	return items
-}
 
-func getCPU() (map[string]interface{}, error) {
-	cpus, err := cpu.Info()
-	if err != nil {
-		return nil, err
+	// network
+	nics, err := net.Interfaces()
+	if err == nil && len(nics) > 0 {
+		for _, nic := range nics {
+			flag := func(f string) string {
+				for _, s := range nic.Flags {
+					if s == f {
+						return "true"
+					}
+				}
+				return "false"
+			}
+			var addrs []string
+			for _, addr := range nic.Addrs {
+				addrs = append(addrs, addr.Addr)
+			}
+			results = append(results, &pb.ServerInfoItem{
+				Tp:   "net",
+				Name: nic.Name,
+				Pairs: []*pb.ServerInfoPair{
+					{Key: "mac", Value: nic.HardwareAddr},
+					{Key: "is-up", Value: flag("up")},
+					{Key: "is-broadcast", Value: flag("broadcast")},
+					{Key: "is-multicast", Value: flag("multicast")},
+					{Key: "is-loopback", Value: flag("loopback")},
+					{Key: "is-point-to-point", Value: flag("pointtopoint")},
+					{Key: "addresses", Value: strings.Join(addrs, ",")},
+				},
+			})
+		}
 	}
-	m := make(map[string]interface{}, len(cpus))
-	for _, c := range cpus {
-		name := "cpu" + strconv.FormatInt(int64(c.CPU), 10)
-		m[name] = c
-	}
-	return m, nil
-}
-
-func getDisk() (map[string]interface{}, error) {
-	parts, err := disk.Partitions(true)
-	if err != nil {
-		return nil, err
-	}
-	m := make(map[string]interface{}, len(parts))
-	for _, part := range parts {
-		m[part.Device] = part
-	}
-	return m, nil
-}
-
-func getNet() (map[string]interface{}, error) {
-	nets, err := net.Interfaces()
-	if err != nil {
-		return nil, err
-	}
-	m := make(map[string]interface{}, len(nets))
-	for _, n := range nets {
-		m[n.Name] = n
-	}
-	return m, nil
-}
-
-func getHost() (interface{}, error) {
-	return host.Info()
+	return results
 }

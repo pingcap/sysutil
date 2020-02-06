@@ -3,18 +3,50 @@ package sysutil
 import (
 	"bufio"
 	"bytes"
+	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
+	"github.com/shirou/gopsutil/process"
 )
 
-func getSystemInfo() []*pb.ServerInfoItem {
-	return getSysctl()
+func tryProcFs() []*pb.ServerInfoItem {
+	const dir = "/proc/sys/"
+	item := &pb.ServerInfoItem{
+		Tp:   "system",
+		Name: "sysctl",
+	}
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		content, err := ioutil.ReadFile(path)
+		// Ignore this file
+		if err != nil {
+			return nil
+		}
+		item.Pairs = append(item.Pairs, &pb.ServerInfoPair{
+			Key:   strings.ReplaceAll(strings.TrimPrefix(path, dir), "/", "."),
+			Value: string(content),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil
+	}
+	return []*pb.ServerInfoItem{item}
 }
 
-func getSysctl() []*pb.ServerInfoItem {
+func getSystemInfo() []*pb.ServerInfoItem {
+	if results := tryProcFs(); len(results) > 0 {
+		return results
+	}
+	// fallback to command line
 	cmd := exec.Command("sysctl", "-a")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
@@ -40,11 +72,58 @@ func getSysctl() []*pb.ServerInfoItem {
 
 		}
 	}
-	items := make([]*pb.ServerInfoItem, 0, len(singleDevicesLoadInfoFns))
-	items = append(items, &pb.ServerInfoItem{
+
+	var results []*pb.ServerInfoItem
+	results = append(results, &pb.ServerInfoItem{
 		Tp:    "system",
 		Name:  "sysctl",
 		Pairs: pairs,
 	})
-	return items
+
+	return results
+}
+
+// TODO: use different `ServerInfoType` to collect process list
+func getProcessList() []*pb.ServerInfoItem {
+	var results []*pb.ServerInfoItem
+	pids, err := process.Pids()
+	if err != nil {
+		return results
+	}
+	for _, pid := range pids {
+		p, err := process.NewProcess(pid)
+		if err != nil {
+			continue
+		}
+		name, err := p.Name()
+		if err != nil {
+			continue
+		}
+		prop := func(fn func() (string, error)) string {
+			s, _ := fn()
+			return s
+		}
+		ct, err := p.CreateTime()
+		if err != nil {
+			continue
+		}
+		us, err := p.CPUPercent()
+		if err != nil {
+			continue
+		}
+		results = append(results, &pb.ServerInfoItem{
+			Tp:   "process",
+			Name: fmt.Sprintf("%s(%d)", name, pid),
+			Pairs: []*pb.ServerInfoPair{
+				{Key: "executable", Value: prop(p.Exe)},
+				{Key: "cmd", Value: prop(p.Cmdline)},
+				{Key: "cwd", Value: prop(p.Cwd)},
+				{Key: "start-time", Value: fmt.Sprintf("%d", ct)},
+				{Key: "status", Value: prop(p.Status)},
+				{Key: "cpu-usage", Value: fmt.Sprintf("%.2f", us)},
+			},
+		})
+	}
+
+	return results
 }
