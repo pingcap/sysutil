@@ -5,14 +5,48 @@ import (
 	"bytes"
 	"fmt"
 	"io"
+	"io/ioutil"
+	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/shirou/gopsutil/process"
 )
 
+func tryProcFs() []*pb.ServerInfoItem {
+	const dir = "/proc/sys/"
+	item := &pb.ServerInfoItem{
+		Tp:   "system",
+		Name: "sysctl",
+	}
+	err := filepath.Walk(dir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		content, err := ioutil.ReadFile(path)
+		// Ignore this file
+		if err != nil {
+			return nil
+		}
+		item.Pairs = append(item.Pairs, &pb.ServerInfoPair{
+			Key:   strings.ReplaceAll(strings.TrimPrefix(path, dir), "/", "."),
+			Value: string(content),
+		})
+		return nil
+	})
+	if err != nil {
+		return nil
+	}
+	return []*pb.ServerInfoItem{item}
+}
+
 func getSystemInfo() []*pb.ServerInfoItem {
+	if results := tryProcFs(); len(results) > 0 {
+		return results
+	}
+	// fallback to command line
 	cmd := exec.Command("sysctl", "-a")
 	out, err := cmd.CombinedOutput()
 	if err != nil {
