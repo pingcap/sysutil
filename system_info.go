@@ -46,6 +46,12 @@ func getSystemInfo() []*pb.ServerInfoItem {
 		Pairs: pairs,
 	})
 
+	return results
+}
+
+// TODO: use different `ServerInfoType` to collect process list
+func getProcessList() []*pb.ServerInfoItem {
+	var results []*pb.ServerInfoItem
 	pids, err := process.Pids()
 	if err != nil {
 		return results
