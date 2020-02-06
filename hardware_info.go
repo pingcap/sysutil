@@ -3,6 +3,7 @@ package sysutil
 import (
 	"fmt"
 	"runtime"
+	"strings"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/shirou/gopsutil/cpu"
@@ -55,7 +56,6 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 					{Key: "fstype", Value: p.Fstype},
 					{Key: "opts", Value: p.Opts},
 					{Key: "path", Value: p.Mountpoint},
-					{Key: "type", Value: p.Fstype},
 					{Key: "total", Value: fmt.Sprintf("%d", usage.Total)},
 					{Key: "free", Value: fmt.Sprintf("%d", usage.Free)},
 					{Key: "used", Value: fmt.Sprintf("%d", usage.Used)},
@@ -78,6 +78,10 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 				}
 				return "false"
 			}
+			var addrs []string
+			for _, addr := range nic.Addrs {
+				addrs = append(addrs, addr.Addr)
+			}
 			results = append(results, &pb.ServerInfoItem{
 				Tp:   "net",
 				Name: nic.Name,
@@ -88,6 +92,7 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 					{Key: "is-multicast", Value: flag("multicast")},
 					{Key: "is-loopback", Value: flag("loopback")},
 					{Key: "is-point-to-point", Value: flag("pointtopoint")},
+					{Key: "addresses", Value: strings.Join(addrs, ",")},
 				},
 			})
 		}

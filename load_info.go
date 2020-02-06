@@ -84,7 +84,7 @@ func getMemLoad() []*pb.ServerInfoItem {
 	if err == nil {
 		results = append(results, &pb.ServerInfoItem{
 			Tp:   "memory",
-			Name: "virtual",
+			Name: "swap",
 			Pairs: []*pb.ServerInfoPair{
 				{Key: "total", Value: fmt.Sprintf("%d", swap.Total)},
 				{Key: "used", Value: fmt.Sprintf("%d", swap.Used)},
