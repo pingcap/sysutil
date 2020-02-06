@@ -19,6 +19,7 @@ import (
 	"math"
 	"os"
 	"regexp"
+	"sort"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 )
@@ -109,6 +110,18 @@ func (d *DiagnosticsServer) ServerInfo(ctx context.Context, req *pb.ServerInfoRe
 		items = getHardwareInfo()
 	case pb.ServerInfoType_SystemInfo:
 		items = getSystemInfo()
+	case pb.ServerInfoType_All:
+		items = append(items, getLoadInfo()...)
+		items = append(items, getHardwareInfo()...)
+		items = append(items, getSystemInfo()...)
 	}
+
+	sort.Slice(items, func(i, j int) bool {
+		lhs, rhs := items[i], items[j]
+		if lhs.Tp != rhs.Tp {
+			return lhs.Tp < rhs.Tp
+		}
+		return lhs.Name < rhs.Name
+	})
 	return &pb.ServerInfoResponse{Items: items}, nil
 }
