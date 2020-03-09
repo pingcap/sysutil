@@ -17,7 +17,7 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 	// cpu
 	infos, err := cpu.Info()
 	if err == nil && len(infos) > 0 {
-		physicalCores,err := cpu.Counts(false)
+		physicalCores, err := cpu.Counts(false)
 		if err != nil {
 			physicalCores = int(infos[0].Cores)
 		}
@@ -49,13 +49,16 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 	parts, err := disk.Partitions(true)
 	if err == nil && len(parts) > 0 {
 		for _, p := range parts {
+			if !strings.HasPrefix(p.Device, "/dev/") {
+				continue
+			}
 			usage, err := disk.Usage(p.Mountpoint)
 			if err != nil {
 				continue
 			}
 			results = append(results, &pb.ServerInfoItem{
 				Tp:   "disk",
-				Name: p.Device,
+				Name: p.Device[5:],
 				Pairs: []*pb.ServerInfoPair{
 					{Key: "fstype", Value: p.Fstype},
 					{Key: "opts", Value: p.Opts},
