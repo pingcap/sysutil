@@ -47,10 +47,27 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 
 	// disk
 	parts, err := disk.Partitions(true)
+
+	// m is used to filter the device
+	m := map[string]string{
+		"sda":"",
+		"nvm":"",
+		"dis":"",
+	}
 	if err == nil && len(parts) > 0 {
 		for _, p := range parts {
 			usage, err := disk.Usage(p.Mountpoint)
 			if err != nil {
+				continue
+			}
+
+			// convert device begin with /dev to device without /dev
+			if strings.HasPrefix(p.Device,"/dev/") {
+				p.Device = p.Device[6:]
+			}
+
+			// filter device
+			if _, ok := m[p.Device[:3]]; !ok {
 				continue
 			}
 			results = append(results, &pb.ServerInfoItem{
