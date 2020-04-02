@@ -66,8 +66,8 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 					{Key: "total", Value: fmt.Sprintf("%d", usage.Total)},
 					{Key: "free", Value: fmt.Sprintf("%d", usage.Free)},
 					{Key: "used", Value: fmt.Sprintf("%d", usage.Used)},
-					{Key: "free-percent", Value: fmt.Sprintf("%.2f", 1-usage.UsedPercent)},
-					{Key: "used-percent", Value: fmt.Sprintf("%.2f", usage.UsedPercent)},
+					{Key: "free-percent", Value: fmt.Sprintf("%.2f", (100-usage.UsedPercent)/100.00)},
+					{Key: "used-percent", Value: fmt.Sprintf("%.2f", usage.UsedPercent/100.00)},
 				},
 			})
 		}
