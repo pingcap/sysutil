@@ -39,28 +39,35 @@ func getCpuLoad() []*pb.ServerInfoItem {
 			},
 		})
 	}
-	times, err := cpu.Times(true)
-	if err == nil && len(times) > 0 {
-		for _, t := range times {
-			item := &pb.ServerInfoItem{
-				Tp:   "cpu",
-				Name: t.CPU,
-				Pairs: []*pb.ServerInfoPair{
-					{Key: "user", Value: fmt.Sprintf("%.2f", t.User)},
-					{Key: "system", Value: fmt.Sprintf("%.2f", t.System)},
-					{Key: "idle", Value: fmt.Sprintf("%.2f", t.Idle)},
-					{Key: "nice", Value: fmt.Sprintf("%.2f", t.Nice)},
-					{Key: "iowait", Value: fmt.Sprintf("%.2f", t.Iowait)},
-					{Key: "irq", Value: fmt.Sprintf("%.2f", t.Irq)},
-					{Key: "softirq", Value: fmt.Sprintf("%.2f", t.Softirq)},
-					{Key: "steal", Value: fmt.Sprintf("%.2f", t.Steal)},
-					{Key: "guest", Value: fmt.Sprintf("%.2f", t.Guest)},
-					{Key: "guest_nice", Value: fmt.Sprintf("%.2f", t.GuestNice)},
-				},
-			}
-			results = append(results, item)
-		}
+	t1s, err := cpu.Times(false)
+	if err != nil {
+		return results
 	}
+	time.Sleep(time.Second)
+	t2s, err := cpu.Times(false)
+	if err != nil || len(t1s) != 1 || len(t2s) != 1 {
+		return results
+	}
+	t1 := t1s[0]
+	t2 := t2s[0]
+	total := t2.Total() - t1.Total()
+	item := &pb.ServerInfoItem{
+		Tp:   "cpu",
+		Name: "usage",
+		Pairs: []*pb.ServerInfoPair{
+			{Key: "user", Value: fmt.Sprintf("%.2f", (t2.User-t1.User)/total)},
+			{Key: "system", Value: fmt.Sprintf("%.2f", (t2.System-t1.System)/total)},
+			{Key: "idle", Value: fmt.Sprintf("%.2f", (t2.Idle-t1.Idle)/total)},
+			{Key: "nice", Value: fmt.Sprintf("%.2f", (t2.Nice-t1.Nice)/total)},
+			{Key: "iowait", Value: fmt.Sprintf("%.2f", (t2.Iowait-t1.Iowait)/total)},
+			{Key: "irq", Value: fmt.Sprintf("%.2f", (t2.Irq-t1.Irq)/total)},
+			{Key: "softirq", Value: fmt.Sprintf("%.2f", (t2.Softirq-t1.Softirq)/total)},
+			{Key: "steal", Value: fmt.Sprintf("%.2f", (t2.Steal-t1.Steal)/total)},
+			{Key: "guest", Value: fmt.Sprintf("%.2f", (t2.Guest-t1.Guest)/total)},
+			{Key: "guest_nice", Value: fmt.Sprintf("%.2f", (t2.GuestNice-t1.GuestNice)/total)},
+		},
+	}
+	results = append(results, item)
 	return results
 }
 
