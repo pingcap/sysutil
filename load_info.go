@@ -75,15 +75,18 @@ func getMemLoad() []*pb.ServerInfoItem {
 	var results []*pb.ServerInfoItem
 	virt, err := mem.VirtualMemory()
 	if err == nil {
+		memUsed := virt.Total - virt.Available
+		memUsedPercent := float64(memUsed) / float64(virt.Total)
+
 		results = append(results, &pb.ServerInfoItem{
 			Tp:   "memory",
 			Name: "virtual",
 			Pairs: []*pb.ServerInfoPair{
 				{Key: "total", Value: fmt.Sprintf("%d", virt.Total)},
-				{Key: "used", Value: fmt.Sprintf("%d", virt.Used)},
-				{Key: "free", Value: fmt.Sprintf("%d", virt.Free)},
-				{Key: "used-percent", Value: fmt.Sprintf("%.2f", float64(virt.Used)/float64(virt.Total))},
-				{Key: "free-percent", Value: fmt.Sprintf("%.2f", float64(virt.Free)/float64(virt.Total))},
+				{Key: "used", Value: fmt.Sprintf("%d", memUsed)},
+				{Key: "free", Value: fmt.Sprintf("%d", virt.Available)},
+				{Key: "used-percent", Value: fmt.Sprintf("%.2f", memUsedPercent)},
+				{Key: "free-percent", Value: fmt.Sprintf("%.2f", 1-memUsedPercent)},
 			},
 		})
 	}
