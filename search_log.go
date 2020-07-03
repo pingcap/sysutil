@@ -73,31 +73,25 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 			return nil
 		}
 		reader := bufio.NewReader(file)
-		// Skip this file if cannot read the first line
-		firstLine, err := readLine(reader)
-		if err != nil && err != io.EOF {
-			skipFiles = append(skipFiles, file)
-			return nil
-		}
-		// Skip this file if the first line is not a valid log message
-		firstItem, err := parseLogItem(firstLine)
+
+		firstItem, err := readFirstValidLog(reader, 0)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
-		// Skip this file if cannot read the last line
-		lastLine := readLastLine(file)
-		// Skip this file if the last line is not a valid log message
-		lastItem, err := parseLogItem(lastLine)
+
+		lastItem, err := readLastValidLog(file, 0)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
+
 		// Reset position to the start and skip this file if cannot seek to start
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
+
 		if beginTime > lastItem.Time || endTime < firstItem.Time {
 			skipFiles = append(skipFiles, file)
 		} else {
@@ -109,16 +103,61 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		}
 		return nil
 	})
+
 	defer func() {
 		for _, f := range skipFiles {
 			_ = f.Close()
 		}
 	}()
+
 	// Sort by start time
 	sort.Slice(logFiles, func(i, j int) bool {
 		return logFiles[i].begin < logFiles[j].begin
 	})
 	return logFiles, err
+}
+
+// parameter tryLines: if value is 0, means unlimited
+func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, error) {
+	var tried int64
+	for {
+		line, err := readLine(reader)
+		if err != nil {
+			return nil, err
+		}
+		item, err := parseLogItem(line)
+		if err == nil {
+			return item, nil
+		}
+		tried++
+		if tryLines > 0 && tried >= tryLines {
+			break
+		}
+	}
+	return nil, errors.New("not a valid log file")
+}
+
+// parameter tryLines: if value is 0, means unlimited
+func readLastValidLog(file *os.File, tryLines int64) (*pb.LogMessage, error) {
+	var tried int64
+	var endCursor int64
+	for {
+		line := readLineReverse(file, endCursor)
+		// read out the file
+		if len(line) == 0 {
+			break
+		}
+		endCursor -= int64(len(line))
+		item, err := parseLogItem(line)
+		if err == nil {
+			return item, nil
+		}
+		tried++
+		if tryLines > 0 && tried >= tryLines {
+			break
+		}
+	}
+	return nil, errors.New("not a valid log file")
 }
 
 // Read a line from a reader.
@@ -136,20 +175,21 @@ func readLine(reader *bufio.Reader) (string, error) {
 	return string(line), nil
 }
 
-func readLastLine(file *os.File) string {
+// Read a line from the end of a file.
+func readLineReverse(file *os.File, endCursor int64) string {
 	var line []byte
-	var cursor int64
+	var cursor = endCursor
 	stat, _ := file.Stat()
 	filesize := stat.Size()
 	for {
-		cursor -= 1
+		cursor--
 		file.Seek(cursor, io.SeekEnd)
 
 		char := make([]byte, 1)
 		file.Read(char)
 
 		// stop if we find a line
-		if cursor != -1 && (char[0] == 10 || char[0] == 13) {
+		if cursor != endCursor-1 && (char[0] == 10 || char[0] == 13) {
 			break
 		}
 		line = append(line, char[0])
@@ -163,7 +203,7 @@ func readLastLine(file *os.File) string {
 	return string(line)
 }
 
-// Returns LogLevel from string and return LogLevel_Info if
+// ParseLogLevel returns LogLevel from string and return LogLevel_Info if
 // the string is an invalid level string
 func ParseLogLevel(s string) pb.LogLevel {
 	switch s {
