@@ -176,7 +176,7 @@ func readLine(reader *bufio.Reader) (string, error) {
 }
 
 // Read a line from the end of a file.
-// TODO: byte by byte read is low effiency, we can improve it
+// TODO: read byte by byte is low efficiency, we can improve it, for example, read 1024 bytes one time
 func readLineReverse(file *os.File, endCursor int64) string {
 	var line []byte
 	var cursor = endCursor
