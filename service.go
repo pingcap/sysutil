@@ -73,18 +73,29 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 	}
 	defer iter.close()
 
+	var preMessage *pb.LogMessage
 	for {
 		var messages []*pb.LogMessage
 		var drained bool
 		for i := 0; i < 1024; i++ {
 			item, err := iter.next()
-			if err != nil && err == io.EOF {
+			if err == io.EOF {
 				drained = true
 				break
 			}
 			if err != nil {
 				return err
 			}
+			// invalid log
+			if item.Time == 0 {
+				if preMessage == nil {
+					continue
+				}
+				// use the previous message's time and level
+				item.Time = preMessage.Time
+				item.Level = preMessage.Level
+			}
+			preMessage = item
 			messages = append(messages, item)
 		}
 		res := &pb.SearchLogResponse{

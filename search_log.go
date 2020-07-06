@@ -176,6 +176,7 @@ func readLine(reader *bufio.Reader) (string, error) {
 }
 
 // Read a line from the end of a file.
+// TODO: byte by byte read is low effiency, we can improve it
 func readLineReverse(file *os.File, endCursor int64) string {
 	var line []byte
 	var cursor = endCursor
@@ -314,21 +315,27 @@ nextLine:
 			iter.reader.Reset(iter.pending[iter.fileIndex])
 			continue
 		}
-		if len(line) < len(TimeStampLayout) {
+		line = strings.TrimSpace(line)
+		if len(line) == 0 {
 			continue
 		}
-		// Skip invalid log item
 		item, err := parseLogItem(line)
 		if err != nil {
-			continue
+			// handle invalid log
+			// make whole line as log message with 0 time and 0 level
+			item = &pb.LogMessage{
+				Time:    0,
+				Level:   0,
+				Message: line,
+			}
 		}
-		if item.Time > iter.end {
+		if item.Time > 0 && item.Time > iter.end {
 			return nil, io.EOF
 		}
-		if item.Time < iter.begin {
+		if item.Time > 0 && item.Time < iter.begin {
 			continue
 		}
-		if iter.levelFlag != 0 && iter.levelFlag&(1<<item.Level) == 0 {
+		if item.Level > 0 && iter.levelFlag != 0 && iter.levelFlag&(1<<item.Level) == 0 {
 			continue
 		}
 		if len(iter.patterns) > 0 {
