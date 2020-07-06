@@ -285,6 +285,7 @@ type logIterator struct {
 	fileIndex int
 	reader    *bufio.Reader
 	pending   []*os.File
+	preTime   int64
 }
 
 // The Close method close all resources the iterator has.
@@ -321,21 +322,27 @@ nextLine:
 		}
 		item, err := parseLogItem(line)
 		if err != nil {
+			if iter.preTime == 0 {
+				continue
+			}
 			// handle invalid log
-			// make whole line as log message with 0 time and 0 level
+			// make whole line as log message with pre time and unknown log_level
 			item = &pb.LogMessage{
-				Time:    0,
-				Level:   0,
+				Time:    iter.preTime,
+				Level:   pb.LogLevel_UNKNOWN,
 				Message: line,
 			}
+		} else {
+			iter.preTime = item.Time
 		}
-		if item.Time > 0 && item.Time > iter.end {
+		if item.Time > iter.end {
 			return nil, io.EOF
 		}
-		if item.Time > 0 && item.Time < iter.begin {
+		if item.Time < iter.begin {
 			continue
 		}
-		if item.Level > 0 && iter.levelFlag != 0 && iter.levelFlag&(1<<item.Level) == 0 {
+		// always keep unknown log_level
+		if item.Level > pb.LogLevel_UNKNOWN && iter.levelFlag != 0 && iter.levelFlag&(1<<item.Level) == 0 {
 			continue
 		}
 		if len(iter.patterns) > 0 {

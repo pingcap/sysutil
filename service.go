@@ -73,7 +73,6 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 	}
 	defer iter.close()
 
-	var preMessage *pb.LogMessage
 	for {
 		var messages []*pb.LogMessage
 		var drained bool
@@ -86,16 +85,6 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 			if err != nil {
 				return err
 			}
-			// invalid log
-			if item.Time == 0 {
-				if preMessage == nil {
-					continue
-				}
-				// use the previous message's time and level
-				item.Time = preMessage.Time
-				item.Level = preMessage.Level
-			}
-			preMessage = item
 			messages = append(messages, item)
 		}
 		res := &pb.SearchLogResponse{
