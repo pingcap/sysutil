@@ -213,6 +213,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+		`This is an invalid log blablabla`,
 		`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
@@ -231,6 +232,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	s.writeTmpFile(c, "rpc.tidb-3.log", []string{``})
 	s.writeTmpFile(c, "rpc.tidb-4.log", []string{
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`This is also an invalid log contains partern ...`,
 		`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -258,11 +260,13 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -277,11 +281,13 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -298,6 +304,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 			},
 		},
@@ -309,6 +316,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -323,11 +331,13 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			expect: []string{
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 			},
 		},
@@ -346,6 +356,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 			},
 		},
 		// 7
@@ -355,6 +366,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 			},
 		},
 		// 8
@@ -363,6 +375,8 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			levels: []pb.LogLevel{pb.LogLevel_Debug},
 			expect: []string{
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 			},
 		},
 		// 9
@@ -370,7 +384,9 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			search: timeRange{"2019/08/26 06:19:15.011 -04:00", "2019/08/26 06:22:14.011 -04:00"},
 			levels: []pb.LogLevel{pb.LogLevel_Trace},
 			expect: []string{
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 			},
 		},
 		// 10
@@ -378,9 +394,11 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			search: timeRange{"2019/08/26 06:19:15.011 -04:00", "2019/08/26 06:22:14.011 -04:00"},
 			levels: []pb.LogLevel{pb.LogLevel_Info},
 			expect: []string{
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 			},
 		},
 		// 11
@@ -388,7 +406,9 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			search: timeRange{"2019/08/26 06:19:15.011 -04:00", "2019/08/26 06:22:14.011 -04:00"},
 			levels: []pb.LogLevel{pb.LogLevel_Warn},
 			expect: []string{
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 			},
 		},
@@ -398,6 +418,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			levels: []pb.LogLevel{pb.LogLevel_Error},
 			expect: []string{
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [UNKNOWN] This is an invalid log blablabla`,
 			},
 		},
 		// 13
@@ -406,6 +427,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			levels:   []pb.LogLevel{pb.LogLevel_Info},
 			patterns: []string{".*partern.*"},
 			expect: []string{
+				`[2019/08/26 06:22:14.011 -04:00] [UNKNOWN] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
 				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 			},
