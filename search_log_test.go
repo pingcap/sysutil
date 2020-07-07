@@ -547,14 +547,12 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 
 	// step 2. open it as read only mode
 	path := filepath.Join(s.tmpDir, "tidb.log")
-	fmt.Println("path: ", path)
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 	c.Assert(err, IsNil, Commentf("open file %s failed", path))
 	defer file.Close()
 
 	stat, _ := file.Stat()
 	filesize := stat.Size()
-	fmt.Println("initial filesize: ", filesize)
 
 	// step 3. run a goroutine to append some new logs to the file
 	go func() {
@@ -566,70 +564,31 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 			line := fmt.Sprintf("[2020/07/07 06:%d:17.011 -04:00] [INFO] appended logs\n", i)
 			_, err := file_append.WriteString(line)
 			c.Assert(err, IsNil, Commentf("write %s failed", line))
-			fmt.Print("write line: ", line)
 
 			time.Sleep(50 * time.Millisecond)
 		}
 	}()
 
-	// step 4. keep calling readLineReverse util it is empty
-	var endCursor int64
+	// step 4. keep calling readLineReverse until it is empty
+	expected := []string{
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+	}
+	i := 0
+	endCursor := filesize
 	for {
 		line := sysutil.ReadLineReverse(file, endCursor)
-		fmt.Print("read line: ", line)
 		// read out the file
 		if len(line) == 0 {
 			break
 		}
+		c.Assert(line, Equals, expected[i], Commentf("expected: %v, got: %v", expected[i], line))
+		i++
 		endCursor -= int64(len(line))
 
 		time.Sleep(60 * time.Millisecond)
 	}
-
-	// print final content
-	file.Seek(0, io.SeekStart)
-	var content = make([]byte, 1024)
-	file.Read(content)
-	fmt.Println("final content:\n", string(content))
 }
-
-// result: (may be different every time)
-// path:  /var/folders/8z/_463bq6100qgyt1ns0zsf3x00000gn/T/sysutil584451097/tidb.log
-// initial filesize:  385
-// current filesize: 385
-// write line: [2020/07/07 06:40:17.011 -04:00] [INFO] appended logs
-// read line: [2020/07/07 0FO] [printer.go:41] ["Welcome to TiDB."]
-// write line: [2020/07/07 06:41:17.011 -04:00] [INFO] appended logs
-// current filesize: 493
-// read line: [2020/07/07 06:40:17.011 -04:00] [INFO] appended logs
-// write line: [2020/07/07 06:42:17.011 -04:00] [INFO] appended logs
-// current filesize: 547
-// read line: [2020/07/07 06:40:17.011 -04:00] [INFO] appended logs
-// write line: [2020/07/07 06:43:17.011 -04:00] [INFO] appended logs
-// current filesize: 601
-// read line: [2020/07/07 06:40:17.011 -04:00] [INFO] appended logs
-// write line: [2020/07/07 06:44:17.011 -04:00] [INFO] appended logs
-// current filesize: 655
-// read line: [2020/07/07 06:40:17.011 -04:00] [INFO] appended logs
-// current filesize: 655
-// read line: [2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// current filesize: 655
-// read line: [2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// current filesize: 655
-// read line: [2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// current filesize: 655
-// read line: [2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// current filesize: 655
-// read line: [2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// current filesize: 655
-// read line: final content:
-//  [2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// [2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// [2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// [2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// [2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]
-// [2020/07/07 06:40:17.011 -04:00] [INFO] appended logs
-// [2020/07/07 06:41:17.011 -04:00] [INFO] appended logs
-// [2020/07/07 06:42:17.011 -04:00] [INFO] appended logs
-// [2020/07/07 06:43:17.011 -04:00] [INFO] appended logs
-// [2020/07/07 06:44:17.011 -04:00] [INFO] appended logs

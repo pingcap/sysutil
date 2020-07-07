@@ -140,7 +140,8 @@ func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, er
 // parameter tryLines: if value is 0, means unlimited
 func readLastValidLog(file *os.File, tryLines int64) (*pb.LogMessage, error) {
 	var tried int64
-	var endCursor int64
+	stat, _ := file.Stat()
+	endCursor := stat.Size()
 	for {
 		line := readLineReverse(file, endCursor)
 		// read out the file
@@ -175,29 +176,26 @@ func readLine(reader *bufio.Reader) (string, error) {
 	return string(line), nil
 }
 
-// Read a line from the end of a file.
+// Read a line from the end of a file
+// startCursor initial value should be the filesize
 // TODO: read byte by byte is low efficiency, we can improve it, for example, read 1024 bytes one time
-func readLineReverse(file *os.File, endCursor int64) string {
+func readLineReverse(file *os.File, startCursor int64) string {
 	var line []byte
-	var cursor = endCursor
-	stat, _ := file.Stat()
-	filesize := stat.Size()
-	fmt.Println("current filesize:", filesize)
+	var cursor = startCursor
 	for {
 		// stop if we are at the begining
 		// check it in the start to avoid read beyond the size
-		if cursor <= -filesize {
+		if cursor <= 0 {
 			break
 		}
 
 		cursor--
-		file.Seek(cursor, io.SeekEnd)
-
+		file.Seek(cursor, io.SeekStart)
 		char := make([]byte, 1)
 		file.Read(char)
 
 		// stop if we find a line
-		if cursor != endCursor-1 && (char[0] == 10 || char[0] == 13) {
+		if cursor != startCursor-1 && (char[0] == 10 || char[0] == 13) {
 			break
 		}
 		line = append(line, char[0])
