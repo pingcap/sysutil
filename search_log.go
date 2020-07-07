@@ -178,10 +178,10 @@ func readLine(reader *bufio.Reader) (string, error) {
 }
 
 // Read lines from the end of a file
-// startCursor initial value should be the filesize
-func readLastLines(file *os.File, startCursor int64) string {
+// endCursor initial value should be the filesize
+func readLastLines(file *os.File, endCursor int64) string {
 	var lines []byte
-	var cursor = startCursor
+	var cursor = endCursor
 	for {
 		// stop if we are at the begining
 		// check it in the start to avoid read beyond the size

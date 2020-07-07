@@ -538,7 +538,7 @@ func (s *searchLogSuite) TestParseLogItem(c *C) {
 func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 	// step 1. initial a log file
 	s.writeTmpFile(c, "tidb.log", []string{
-		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -569,13 +569,13 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 		}
 	}()
 
-	// step 4. keep calling readLineReverse until it is empty
+	// step 4. keep calling ReadLastLines until reach the beginning
 	expected := []string{
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
 			`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
 			`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
 			`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
-		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
 	}
 	i := 0
 	endCursor := filesize
