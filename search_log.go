@@ -182,7 +182,14 @@ func readLineReverse(file *os.File, endCursor int64) string {
 	var cursor = endCursor
 	stat, _ := file.Stat()
 	filesize := stat.Size()
+	fmt.Println("current filesize:", filesize)
 	for {
+		// stop if we are at the begining
+		// check it in the start to avoid read beyond the size
+		if cursor <= -filesize {
+			break
+		}
+
 		cursor--
 		file.Seek(cursor, io.SeekEnd)
 
@@ -194,9 +201,6 @@ func readLineReverse(file *os.File, endCursor int64) string {
 			break
 		}
 		line = append(line, char[0])
-		if cursor == -filesize { // stop if we are at the begining
-			break
-		}
 	}
 	for i, j := 0, len(line)-1; i < j; i, j = i+1, j-1 {
 		line[i], line[j] = line[j], line[i]

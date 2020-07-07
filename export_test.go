@@ -15,8 +15,9 @@ package sysutil
 
 // Export some function to for test purpose
 var (
-	ParseLogItem   = parseLogItem
-	ReadLine       = readLine
-	ParseTimeStamp = parseTimeStamp
-	ResolveFiles   = resolveFiles
+	ParseLogItem    = parseLogItem
+	ReadLine        = readLine
+	ReadLineReverse = readLineReverse
+	ParseTimeStamp  = parseTimeStamp
+	ResolveFiles    = resolveFiles
 )
