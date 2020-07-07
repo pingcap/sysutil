@@ -117,7 +117,6 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 	return logFiles, err
 }
 
-// parameter tryLines: if value is 0, means unlimited
 func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, error) {
 	var tried int64
 	for {
@@ -130,31 +129,33 @@ func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, er
 			return item, nil
 		}
 		tried++
-		if tryLines > 0 && tried >= tryLines {
+		if tried >= tryLines {
 			break
 		}
 	}
 	return nil, errors.New("not a valid log file")
 }
 
-// parameter tryLines: if value is 0, means unlimited
-func readLastValidLog(file *os.File, tryLines int64) (*pb.LogMessage, error) {
-	var tried int64
+func readLastValidLog(file *os.File, tryLines int) (*pb.LogMessage, error) {
+	var tried int
 	stat, _ := file.Stat()
 	endCursor := stat.Size()
 	for {
-		line := readLineReverse(file, endCursor)
+		lines := readLastLines(file, endCursor)
 		// read out the file
-		if len(line) == 0 {
+		if len(lines) == 0 {
 			break
 		}
-		endCursor -= int64(len(line))
-		item, err := parseLogItem(line)
-		if err == nil {
-			return item, nil
+		endCursor -= int64(len(lines))
+		linesSlice := strings.FieldsFunc(lines, func(c rune) bool { return c == '\n' || c == '\r' })
+		for i := len(linesSlice) - 1; i >= 0; i-- {
+			item, err := parseLogItem(linesSlice[i])
+			if err == nil {
+				return item, nil
+			}
 		}
-		tried++
-		if tryLines > 0 && tried >= tryLines {
+		tried += len(linesSlice)
+		if tried >= tryLines {
 			break
 		}
 	}
@@ -176,11 +177,10 @@ func readLine(reader *bufio.Reader) (string, error) {
 	return string(line), nil
 }
 
-// Read a line from the end of a file
+// Read lines from the end of a file
 // startCursor initial value should be the filesize
-// TODO: read byte by byte is low efficiency, we can improve it, for example, read 1024 bytes one time
-func readLineReverse(file *os.File, startCursor int64) string {
-	var line []byte
+func readLastLines(file *os.File, startCursor int64) string {
+	var lines []byte
 	var cursor = startCursor
 	for {
 		// stop if we are at the begining
@@ -189,21 +189,30 @@ func readLineReverse(file *os.File, startCursor int64) string {
 			break
 		}
 
-		cursor--
-		file.Seek(cursor, io.SeekStart)
-		char := make([]byte, 1)
-		file.Read(char)
-
-		// stop if we find a line
-		if cursor != startCursor-1 && (char[0] == 10 || char[0] == 13) {
-			break
+		var size int64 = 512
+		if cursor < size {
+			size = cursor
 		}
-		line = append(line, char[0])
+		cursor -= size
+
+		file.Seek(cursor, io.SeekStart)
+		chars := make([]byte, size)
+		file.Read(chars)
+		lines = append(chars, lines...)
+
+		// find first '\n' or '\r'
+		for i := 0; i < len(chars); i++ {
+			// reach the line end
+			if i >= len(lines)-1 {
+				break
+			}
+
+			if (chars[i] == 10 || chars[i] == 13) && chars[i+1] != 10 && chars[i+1] != 13 {
+				return string(lines[i+1:])
+			}
+		}
 	}
-	for i, j := 0, len(line)-1; i < j; i, j = i+1, j-1 {
-		line[i], line[j] = line[j], line[i]
-	}
-	return string(line)
+	return string(lines)
 }
 
 // ParseLogLevel returns LogLevel from string and return LogLevel_Info if

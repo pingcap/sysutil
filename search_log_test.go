@@ -565,22 +565,22 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 			_, err := file_append.WriteString(line)
 			c.Assert(err, IsNil, Commentf("write %s failed", line))
 
-			time.Sleep(50 * time.Millisecond)
+			time.Sleep(10 * time.Millisecond)
 		}
 	}()
 
 	// step 4. keep calling readLineReverse until it is empty
 	expected := []string{
-		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
-		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
-		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
-		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
+			`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
+			`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
+			`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
 	}
 	i := 0
 	endCursor := filesize
 	for {
-		line := sysutil.ReadLineReverse(file, endCursor)
+		line := sysutil.ReadLastLines(file, endCursor)
 		// read out the file
 		if len(line) == 0 {
 			break
@@ -589,6 +589,6 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 		i++
 		endCursor -= int64(len(line))
 
-		time.Sleep(60 * time.Millisecond)
+		time.Sleep(15 * time.Millisecond)
 	}
 }
