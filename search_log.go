@@ -74,13 +74,13 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		}
 		reader := bufio.NewReader(file)
 
-		firstItem, err := readFirstValidLog(reader, 0)
+		firstItem, err := readFirstValidLog(reader, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
 
-		lastItem, err := readLastValidLog(file, 0)
+		lastItem, err := readLastValidLog(file, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
