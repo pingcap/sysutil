@@ -592,3 +592,37 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 		time.Sleep(15 * time.Millisecond)
 	}
 }
+
+func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
+	// step 1. initial a log file
+	s.writeTmpFile(c, "tidb.log", []string{
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	})
+
+	// step 2. open it as read only mode
+	path := filepath.Join(s.tmpDir, "tidb.log")
+	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+	c.Assert(err, IsNil, Commentf("open file %s failed", path))
+	defer file.Close()
+
+	stat, _ := file.Stat()
+	filesize := stat.Size()
+
+	// step 3. start to benchmark
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		sysutil.ReadLastLines(file, filesize)
+	}
+}
+
+// run benchmark by `go test -check.b`
+// result:
+// searchLogSuite.BenchmarkReadLastLines      1000000              1920 ns/op
+// searchLogSuite.BenchmarkReadLastLines      1000000              1892 ns/op
+// result for the old readLastLine method:
+// searchLogSuite.BenchmarkReadLastLine        10000            124423 ns/op
+// searchLogSuite.BenchmarkReadLastLine        10000            126135 ns/op
