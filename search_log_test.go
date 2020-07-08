@@ -580,14 +580,14 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 	i := 0
 	endCursor := filesize
 	for {
-		line := sysutil.ReadLastLines(file, endCursor)
+		lines, readBytes := sysutil.ReadLastLines(file, endCursor)
 		// read out the file
-		if len(line) == 0 {
+		if readBytes == 0 {
 			break
 		}
-		c.Assert(line, Equals, expected[i], Commentf("expected: %v, got: %v", expected[i], line))
+		c.Assert(strings.Join(lines, "\n"), Equals, expected[i], Commentf("expected: %v, got: %v", expected[i], lines))
 		i++
-		endCursor -= int64(len(line))
+		endCursor -= int64(readBytes)
 
 		time.Sleep(15 * time.Millisecond)
 	}
@@ -621,8 +621,8 @@ func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
 
 // run benchmark by `go test -check.b`
 // result:
-// searchLogSuite.BenchmarkReadLastLines      1000000              1920 ns/op
-// searchLogSuite.BenchmarkReadLastLines      1000000              1892 ns/op
+// searchLogSuite.BenchmarkReadLastLines      1000000              2008 ns/op
+// searchLogSuite.BenchmarkReadLastLines      1000000              2193 ns/op
 // result for the old readLastLine method:
 // searchLogSuite.BenchmarkReadLastLine        10000            124423 ns/op
 // searchLogSuite.BenchmarkReadLastLine        10000            126135 ns/op

@@ -141,20 +141,19 @@ func readLastValidLog(file *os.File, tryLines int) (*pb.LogMessage, error) {
 	stat, _ := file.Stat()
 	endCursor := stat.Size()
 	for {
-		lines := readLastLines(file, endCursor)
+		lines, readBytes := readLastLines(file, endCursor)
 		// read out the file
-		if len(lines) == 0 {
+		if readBytes == 0 {
 			break
 		}
-		endCursor -= int64(len(lines))
-		linesSlice := strings.FieldsFunc(lines, func(c rune) bool { return c == '\n' || c == '\r' })
-		for i := len(linesSlice) - 1; i >= 0; i-- {
-			item, err := parseLogItem(linesSlice[i])
+		endCursor -= int64(readBytes)
+		for i := len(lines) - 1; i >= 0; i-- {
+			item, err := parseLogItem(lines[i])
 			if err == nil {
 				return item, nil
 			}
 		}
-		tried += len(linesSlice)
+		tried += len(lines)
 		if tried >= tryLines {
 			break
 		}
@@ -179,8 +178,9 @@ func readLine(reader *bufio.Reader) (string, error) {
 
 // Read lines from the end of a file
 // endCursor initial value should be the filesize
-func readLastLines(file *os.File, endCursor int64) string {
+func readLastLines(file *os.File, endCursor int64) ([]string, int) {
 	var lines []byte
+	var firstNonNewlinePos int
 	var cursor = endCursor
 	for {
 		// stop if we are at the begining
@@ -203,16 +203,21 @@ func readLastLines(file *os.File, endCursor int64) string {
 		// find first '\n' or '\r'
 		for i := 0; i < len(chars); i++ {
 			// reach the line end
+			// the first newline may be in the line end at the first round
 			if i >= len(lines)-1 {
 				break
 			}
-
 			if (chars[i] == 10 || chars[i] == 13) && chars[i+1] != 10 && chars[i+1] != 13 {
-				return string(lines[i+1:])
+				firstNonNewlinePos = i + 1
+				break
 			}
 		}
+		if firstNonNewlinePos > 0 {
+			break
+		}
 	}
-	return string(lines)
+	finalStr := string(lines[firstNonNewlinePos:])
+	return strings.Split(strings.ReplaceAll(finalStr, "\r\n", "\n"), "\n"), len(finalStr)
 }
 
 // ParseLogLevel returns LogLevel from string and return LogLevel_Info if
