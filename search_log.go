@@ -191,9 +191,10 @@ func readLastLines(file *os.File, endCursor int64) string {
 
 		var size int64 = 512
 		if cursor < size {
-			size = cursor
+			cursor = 0
+		} else {
+			cursor -= size
 		}
-		cursor -= size
 
 		file.Seek(cursor, io.SeekStart)
 		chars := make([]byte, size)
