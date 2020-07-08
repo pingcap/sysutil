@@ -623,6 +623,9 @@ func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
 // result:
 // searchLogSuite.BenchmarkReadLastLines      1000000              2008 ns/op
 // searchLogSuite.BenchmarkReadLastLines      1000000              2193 ns/op
-// result for the old readLastLine method:
+// result for the old readLastLine method when last line is 76 bytes long:
 // searchLogSuite.BenchmarkReadLastLine        10000            124423 ns/op
 // searchLogSuite.BenchmarkReadLastLine        10000            126135 ns/op
+// result for the old readLastLine method when last line is 76*2 bytes long:
+// searchLogSuite.BenchmarkReadLastLine        10000            247836 ns/op
+// searchLogSuite.BenchmarkReadLastLine        10000            251958 ns/op
