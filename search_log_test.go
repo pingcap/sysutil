@@ -523,7 +523,8 @@ func (s *searchLogSuite) BenchmarkReadLastLine(c *C) {
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
-		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` +
+			`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// step 2. open it as read only mode
@@ -540,6 +541,10 @@ func (s *searchLogSuite) BenchmarkReadLastLine(c *C) {
 }
 
 // run benchmark by `go test -check.b`
-// result:
+// result for the last line of 76:
 // searchLogSuite.BenchmarkReadLastLine        10000            124423 ns/op
 // searchLogSuite.BenchmarkReadLastLine        10000            126135 ns/op
+//
+// result for the last line of 76*2=152:
+// searchLogSuite.BenchmarkReadLastLine        10000            247836 ns/op
+// searchLogSuite.BenchmarkReadLastLine        10000            251958 ns/op
