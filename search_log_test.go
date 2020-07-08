@@ -515,3 +515,31 @@ func (s *searchLogSuite) TestParseLogItem(c *C) {
 		c.Assert(item.Message, Equals, cas.message)
 	}
 }
+
+func (s *searchLogSuite) BenchmarkReadLastLine(c *C) {
+	// step 1. initial a log file
+	s.writeTmpFile(c, "tidb.log", []string{
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	})
+
+	// step 2. open it as read only mode
+	path := filepath.Join(s.tmpDir, "tidb.log")
+	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+	c.Assert(err, IsNil, Commentf("open file %s failed", path))
+	defer file.Close()
+
+	// step 3. start to benchmark
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		sysutil.ReadLastLine(file)
+	}
+}
+
+// run benchmark by `go test -check.b`
+// result:
+// searchLogSuite.BenchmarkReadLastLine        10000            124423 ns/op
+// searchLogSuite.BenchmarkReadLastLine        10000            126135 ns/op

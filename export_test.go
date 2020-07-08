@@ -17,6 +17,7 @@ package sysutil
 var (
 	ParseLogItem   = parseLogItem
 	ReadLine       = readLine
+	ReadLastLine   = readLastLine
 	ParseTimeStamp = parseTimeStamp
 	ResolveFiles   = resolveFiles
 )
