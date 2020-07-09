@@ -342,7 +342,7 @@ nextLine:
 				continue
 			}
 			// handle invalid log
-			// make whole line as log message with pre time and unknown log_level
+			// make whole line as log message with pre time and pre log_level
 			item = &pb.LogMessage{
 				Time:    iter.preLog.Time,
 				Level:   iter.preLog.Level,
