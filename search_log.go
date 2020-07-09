@@ -271,21 +271,20 @@ func parseLogItem(s string) (*pb.LogMessage, error) {
 	return item, nil
 }
 
-const TimeStampLayout = "2006/01/02 15:04:05.000 -07:00"
+const (
+	timeStampLayout    = "2006/01/02 15:04:05.000 -07:00"
+	timeStampLayoutLen = len(timeStampLayout)
+)
 
 // TiDB / TiKV / PD unified log format
 // [2019/03/04 17:04:24.614 +08:00] ...
 func parseTimeStamp(s string) (int64, error) {
-	t, err := time.Parse(TimeStampLayout, s)
+	t, err := time.Parse(timeStampLayout, s)
 	if err != nil {
 		return 0, err
 	}
 	return t.UnixNano() / int64(time.Millisecond), nil
 }
-
-// Only enable seek when position range is more than SEEK_THRESHOLD.
-// The suggested value of SEEK_THRESHOLD is the biggest log size.
-const SEEK_THRESHOLD = 1024 * 1024
 
 // logIterator implements Iterator and IteratorWithPeek interface.
 // It's used for reading logs from log files one by one by their
@@ -333,7 +332,7 @@ nextLine:
 			continue
 		}
 		line = strings.TrimSpace(line)
-		if len(line) == 0 {
+		if iter.preLog == nil && len(line) < timeStampLayoutLen {
 			continue
 		}
 		item, err := parseLogItem(line)
