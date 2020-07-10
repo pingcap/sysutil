@@ -73,11 +73,15 @@ func (s *searchLogSuite) writeTmpFile(c *C, filename string, lines []string) {
 
 func (s *searchLogSuite) TestResoveFiles(c *C) {
 	s.writeTmpFile(c, "tidb.log", []string{
+		`20/08/26 06:19:13.011 -04:00 [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`hello TiDB`,
 		`[2019/08/26 06:19:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`20/08/26 06:19:13.011 -04:00 [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`hello TiDB`,
 	})
 
 	// single line file
@@ -209,6 +213,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+		`This is an invalid log blablabla`,
 		`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
@@ -227,6 +232,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	s.writeTmpFile(c, "rpc.tidb-3.log", []string{``})
 	s.writeTmpFile(c, "rpc.tidb-4.log", []string{
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`This is also an invalid log contains partern ...`,
 		`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -254,11 +260,13 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -273,11 +281,13 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -294,6 +304,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 			},
 		},
@@ -305,6 +316,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
@@ -319,11 +331,13 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			expect: []string{
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 			},
 		},
@@ -342,6 +356,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla`,
 			},
 		},
 		// 7
@@ -351,6 +366,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla`,
 			},
 		},
 		// 8
@@ -359,6 +375,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			levels: []pb.LogLevel{pb.LogLevel_Debug},
 			expect: []string{
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla`,
 			},
 		},
 		// 9
@@ -377,6 +394,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] This is also an invalid log contains partern ...`,
 			},
 		},
 		// 11
@@ -402,6 +420,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			levels:   []pb.LogLevel{pb.LogLevel_Info},
 			patterns: []string{".*partern.*"},
 			expect: []string{
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] This is also an invalid log contains partern ...`,
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
 				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 			},
@@ -515,3 +534,98 @@ func (s *searchLogSuite) TestParseLogItem(c *C) {
 		c.Assert(item.Message, Equals, cas.message)
 	}
 }
+
+func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
+	// step 1. initial a log file
+	s.writeTmpFile(c, "tidb.log", []string{
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+	})
+
+	// step 2. open it as read only mode
+	path := filepath.Join(s.tmpDir, "tidb.log")
+	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+	c.Assert(err, IsNil, Commentf("open file %s failed", path))
+	defer file.Close()
+
+	stat, _ := file.Stat()
+	filesize := stat.Size()
+
+	// step 3. run a goroutine to append some new logs to the file
+	go func() {
+		file_append, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+		c.Assert(err, IsNil, Commentf("open file as append mode %s failed", path))
+		defer file_append.Close()
+
+		for i := 40; i < 45; i++ {
+			line := fmt.Sprintf("[2020/07/07 06:%d:17.011 -04:00] [INFO] appended logs\n", i)
+			_, err := file_append.WriteString(line)
+			c.Assert(err, IsNil, Commentf("write %s failed", line))
+
+			time.Sleep(10 * time.Millisecond)
+		}
+	}()
+
+	// step 4. keep calling ReadLastLines until reach the beginning
+	expected := []string{
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
+			`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
+			`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n" +
+			`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]` + "\n",
+	}
+	i := 0
+	endCursor := filesize
+	for {
+		lines, readBytes := sysutil.ReadLastLines(file, endCursor)
+		// read out the file
+		if readBytes == 0 {
+			break
+		}
+		c.Assert(strings.Join(lines, "\n"), Equals, expected[i], Commentf("expected: %v, got: %v", expected[i], lines))
+		i++
+		endCursor -= int64(readBytes)
+
+		time.Sleep(15 * time.Millisecond)
+	}
+}
+
+func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
+	// step 1. initial a log file
+	s.writeTmpFile(c, "tidb.log", []string{
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	})
+
+	// step 2. open it as read only mode
+	path := filepath.Join(s.tmpDir, "tidb.log")
+	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+	c.Assert(err, IsNil, Commentf("open file %s failed", path))
+	defer file.Close()
+
+	stat, _ := file.Stat()
+	filesize := stat.Size()
+
+	// step 3. start to benchmark
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		sysutil.ReadLastLines(file, filesize)
+	}
+}
+
+// run benchmark by `go test -check.b`
+// result:
+// searchLogSuite.BenchmarkReadLastLines      1000000              2008 ns/op
+// searchLogSuite.BenchmarkReadLastLines      1000000              2193 ns/op
+// result for the old readLastLine method when last line is 76 bytes long:
+// searchLogSuite.BenchmarkReadLastLine        10000            124423 ns/op
+// searchLogSuite.BenchmarkReadLastLine        10000            126135 ns/op
+// result for the old readLastLine method when last line is 76*2 bytes long:
+// searchLogSuite.BenchmarkReadLastLine        10000            247836 ns/op
+// searchLogSuite.BenchmarkReadLastLine        10000            251958 ns/op

@@ -78,7 +78,7 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 		var drained bool
 		for i := 0; i < 1024; i++ {
 			item, err := iter.next()
-			if err != nil && err == io.EOF {
+			if err == io.EOF {
 				drained = true
 				break
 			}
