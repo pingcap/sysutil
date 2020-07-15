@@ -272,14 +272,15 @@ func parseLogItem(s string) (*pb.LogMessage, error) {
 }
 
 const (
-	timeStampLayout    = "2006/01/02 15:04:05.000 -07:00"
-	timeStampLayoutLen = len(timeStampLayout)
+	// TimeStampLayout is accessed in dashboard, keep it public
+	TimeStampLayout    = "2006/01/02 15:04:05.000 -07:00"
+	timeStampLayoutLen = len(TimeStampLayout)
 )
 
 // TiDB / TiKV / PD unified log format
 // [2019/03/04 17:04:24.614 +08:00] ...
 func parseTimeStamp(s string) (int64, error) {
-	t, err := time.Parse(timeStampLayout, s)
+	t, err := time.Parse(TimeStampLayout, s)
 	if err != nil {
 		return 0, err
 	}
