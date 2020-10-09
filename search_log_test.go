@@ -241,6 +241,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	s.writeTmpFile(c, "rpc.tidb-5.log", []string{
 		`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
 		`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
+		`[2020/08/04 15:41:52.688 +00:00] [ERROR] [misc.go:91] ["panic ..."] [r="\"assignment to entry in nil map\""] ["stack trace"="github.com/pingcap/tidb/util.WithRecovery.func1\n\t...`,
 	})
 
 	type timeRange struct{ start, end string }
@@ -294,6 +295,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:22:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
 				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
+				`[2020/08/04 15:41:52.688 +00:00] [ERROR] [misc.go:91] ["panic ..."] [r="\"assignment to entry in nil map\""] ["stack trace"="github.com/pingcap/tidb/util.WithRecovery.func1\n\t...`,
 			},
 		},
 		// 2
@@ -323,6 +325,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:22:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
 				`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
+				`[2020/08/04 15:41:52.688 +00:00] [ERROR] [misc.go:91] ["panic ..."] [r="\"assignment to entry in nil map\""] ["stack trace"="github.com/pingcap/tidb/util.WithRecovery.func1\n\t...`,
 			},
 		},
 		// 4
