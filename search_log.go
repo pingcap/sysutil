@@ -250,13 +250,14 @@ func ParseLogLevel(s string) pb.LogLevel {
 // [2019/08/26 07:19:49.529 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."] ["Release Version"=v3.0.2]...
 // [2019/08/21 01:43:01.460 -04:00] [INFO] [util.go:60] [PD] [release-version=v3.0.2]
 // [2019/08/26 07:20:23.815 -04:00] [INFO] [mod.rs:28] ["Release Version:   3.0.2"]
+// other invalid log...
 func parseLogItem(s string) (*pb.LogMessage, error) {
-	fmt.Printf(s + "\n\n")
 	timeLeftBound := strings.Index(s, "[")
 	timeRightBound := strings.Index(s, "]")
-	if timeLeftBound == -1 || timeRightBound == -1 {
+	if timeLeftBound == -1 || timeRightBound == -1 || timeLeftBound > timeRightBound {
 		return nil, fmt.Errorf("invalid log string: %s", s)
 	}
+
 	time, err := parseTimeStamp(s[timeLeftBound+1 : timeRightBound])
 	if err != nil {
 		return nil, err
