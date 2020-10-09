@@ -256,7 +256,6 @@ func parseLogItem(s string) (*pb.LogMessage, error) {
 	if timeLeftBound == -1 || timeRightBound == -1 || timeLeftBound > timeRightBound {
 		return nil, fmt.Errorf("invalid log string: %s", s)
 	}
-
 	time, err := parseTimeStamp(s[timeLeftBound+1 : timeRightBound])
 	if err != nil {
 		return nil, err
