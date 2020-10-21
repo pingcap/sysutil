@@ -32,7 +32,7 @@ func tryProcFs() []*pb.ServerInfoItem {
 		}
 		item.Pairs = append(item.Pairs, &pb.ServerInfoPair{
 			Key:   strings.ReplaceAll(strings.TrimPrefix(path, dir), "/", "."),
-			Value: string(content),
+			Value: strings.TrimSpace(string(content)),
 		})
 		return nil
 	})
@@ -43,8 +43,9 @@ func tryProcFs() []*pb.ServerInfoItem {
 }
 
 func getSystemInfo() []*pb.ServerInfoItem {
+	hugePage := getTransparentHugepageEnabled()
 	if results := tryProcFs(); len(results) > 0 {
-		return results
+		return append(results, hugePage...)
 	}
 	// fallback to command line
 	cmd := exec.Command("sysctl", "-a")
@@ -80,7 +81,7 @@ func getSystemInfo() []*pb.ServerInfoItem {
 		Pairs: pairs,
 	})
 
-	return results
+	return append(results, hugePage...)
 }
 
 // TODO: use different `ServerInfoType` to collect process list
@@ -126,4 +127,21 @@ func getProcessList() []*pb.ServerInfoItem {
 	}
 
 	return results
+}
+
+func getTransparentHugepageEnabled() []*pb.ServerInfoItem {
+	path := "/sys/kernel/mm/transparent_hugepage/enabled"
+	content, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil
+	}
+	item := &pb.ServerInfoItem{
+		Tp:   "system",
+		Name: "kernel",
+	}
+	item.Pairs = append(item.Pairs, &pb.ServerInfoPair{
+		Key:   "transparent_hugepage_enabled",
+		Value: strings.TrimSpace(string(content)),
+	})
+	return []*pb.ServerInfoItem{item}
 }
