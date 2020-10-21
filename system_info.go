@@ -32,7 +32,7 @@ func tryProcFs() []*pb.ServerInfoItem {
 		}
 		item.Pairs = append(item.Pairs, &pb.ServerInfoPair{
 			Key:   strings.ReplaceAll(strings.TrimPrefix(path, dir), "/", "."),
-			Value: strings.TrimSuffix(string(content), "\n"),
+			Value: strings.TrimSpace(string(content)),
 		})
 		return nil
 	})
@@ -141,7 +141,7 @@ func getTransparentHugepageEnabled() []*pb.ServerInfoItem {
 	}
 	item.Pairs = append(item.Pairs, &pb.ServerInfoPair{
 		Key:   "transparent_hugepage_enabled",
-		Value: strings.TrimSuffix(string(content), "\n"),
+		Value: strings.TrimSpace(string(content)),
 	})
 	return []*pb.ServerInfoItem{item}
 }
