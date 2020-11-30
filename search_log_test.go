@@ -192,7 +192,7 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 		c.Assert(err, IsNil)
 		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
 		c.Assert(err, IsNil)
-		logFiles, err := sysutil.ResolveFiles(filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime)
+		logFiles, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime)
 		c.Assert(err, IsNil)
 		c.Assert(len(logFiles), Equals, len(cas.expect), Commentf("search range (index: %d): %+v", i, cas.search))
 
@@ -580,7 +580,7 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 	i := 0
 	endCursor := filesize
 	for {
-		lines, readBytes := sysutil.ReadLastLines(file, endCursor)
+		lines, readBytes, _ := sysutil.ReadLastLines(context.Background(), file, endCursor)
 		// read out the file
 		if readBytes == 0 {
 			break
@@ -615,7 +615,7 @@ func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
 	// step 3. start to benchmark
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
-		sysutil.ReadLastLines(file, filesize)
+		sysutil.ReadLastLines(context.Background(), file, filesize)
 	}
 }
 
@@ -639,7 +639,7 @@ func (s *searchLogSuite) BenchmarkReadLastLinesOfHugeLine(c *C) {
 	// step 3. start to benchmark
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
-		sysutil.ReadLastLines(file, filesize)
+		sysutil.ReadLastLines(context.Background(), file, filesize)
 	}
 }
 
