@@ -42,7 +42,7 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 		endTime = math.MaxInt64
 	}
 
-	logFiles, err := resolveFiles(d.logFile, beginTime, endTime)
+	logFiles, err := resolveFiles(stream.Context(), d.logFile, beginTime, endTime)
 	if err != nil {
 		return err
 	}

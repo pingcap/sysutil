@@ -15,6 +15,7 @@ package sysutil
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -41,7 +42,7 @@ func (l *logFile) EndTime() int64 {
 	return l.end
 }
 
-func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, error) {
+func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime int64) ([]logFile, error) {
 	if logFilePath == "" {
 		return nil, errors.New("empty log file location configuration")
 	}
@@ -51,6 +52,7 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 	logDir := filepath.Dir(logFilePath)
 	ext := filepath.Ext(logFilePath)
 	filePrefix := logFilePath[:len(logFilePath)-len(ext)]
+	fmt.Printf("prefix: %v, ext: %v --\n", filePrefix, ext)
 	err := filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -65,6 +67,9 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		if !strings.HasSuffix(path, ext) {
 			return nil
 		}
+		if isCtxDone(ctx) {
+			return ctx.Err()
+		}
 		// If we cannot open the file, we skip to search the file instead of returning
 		// error and abort entire searching task.
 		// TODO: do we need to return some warning to client?
@@ -74,13 +79,13 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		}
 		reader := bufio.NewReader(file)
 
-		firstItem, err := readFirstValidLog(reader, 10)
+		firstItem, err := readFirstValidLog(ctx, reader, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
 
-		lastItem, err := readLastValidLog(file, 10)
+		lastItem, err := readLastValidLog(ctx, file, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
@@ -104,6 +109,8 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		return nil
 	})
 
+	fmt.Printf("resolve log finish   %v--\n", time.Now())
+
 	defer func() {
 		for _, f := range skipFiles {
 			_ = f.Close()
@@ -117,7 +124,16 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 	return logFiles, err
 }
 
-func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, error) {
+func isCtxDone(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func readFirstValidLog(ctx context.Context, reader *bufio.Reader, tryLines int64) (*pb.LogMessage, error) {
 	var tried int64
 	for {
 		line, err := readLine(reader)
@@ -132,11 +148,14 @@ func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, er
 		if tried >= tryLines {
 			break
 		}
+		if isCtxDone(ctx) {
+			return nil, ctx.Err()
+		}
 	}
 	return nil, errors.New("not a valid log file")
 }
 
-func readLastValidLog(file *os.File, tryLines int) (*pb.LogMessage, error) {
+func readLastValidLog(ctx context.Context, file *os.File, tryLines int) (*pb.LogMessage, error) {
 	var tried int
 	stat, _ := file.Stat()
 	endCursor := stat.Size()
@@ -156,6 +175,9 @@ func readLastValidLog(file *os.File, tryLines int) (*pb.LogMessage, error) {
 		tried += len(lines)
 		if tried >= tryLines {
 			break
+		}
+		if isCtxDone(ctx) {
+			return nil, ctx.Err()
 		}
 	}
 	return nil, errors.New("not a valid log file")
