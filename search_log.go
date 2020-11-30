@@ -203,6 +203,8 @@ func readLine(reader *bufio.Reader) (string, error) {
 	return string(line), nil
 }
 
+const maxReadCacheSize = 1024 * 1024 * 16
+
 // Read lines from the end of a file
 // endCursor initial value should be the file size
 func readLastLines(ctx context.Context, file *os.File, endCursor int64) ([]string, int, error) {
@@ -219,6 +221,9 @@ func readLastLines(ctx context.Context, file *os.File, endCursor int64) ([]strin
 
 		// enlarge the read cache to avoid too many memory move.
 		size = size * 2
+		if size > maxReadCacheSize {
+			size = maxReadCacheSize
+		}
 		if cursor < size {
 			size = cursor
 		}
