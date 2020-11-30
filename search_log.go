@@ -182,6 +182,7 @@ func readLastLines(file *os.File, endCursor int64) ([]string, int) {
 	var lines []byte
 	var firstNonNewlinePos int
 	var cursor = endCursor
+	var size int64 = 256
 	for {
 		// stop if we are at the begining
 		// check it in the start to avoid read beyond the size
@@ -189,7 +190,8 @@ func readLastLines(file *os.File, endCursor int64) ([]string, int) {
 			break
 		}
 
-		var size int64 = 512
+		// enlarge the read cache to avoid too many memory move.
+		size = size * 2
 		if cursor < size {
 			size = cursor
 		}
