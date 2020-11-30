@@ -580,7 +580,7 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 	i := 0
 	endCursor := filesize
 	for {
-		lines, readBytes := sysutil.ReadLastLines(file, endCursor)
+		lines, readBytes, _ := sysutil.ReadLastLines(context.Background(), file, endCursor)
 		// read out the file
 		if readBytes == 0 {
 			break
@@ -615,7 +615,7 @@ func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
 	// step 3. start to benchmark
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
-		sysutil.ReadLastLines(file, filesize)
+		sysutil.ReadLastLines(context.Background(), file, filesize)
 	}
 }
 

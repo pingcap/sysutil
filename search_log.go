@@ -165,7 +165,10 @@ func readLastValidLog(ctx context.Context, file *os.File, tryLines int) (*pb.Log
 	stat, _ := file.Stat()
 	endCursor := stat.Size()
 	for {
-		lines, readBytes := readLastLines(file, endCursor)
+		lines, readBytes, err := readLastLines(ctx, file, endCursor)
+		if err != nil {
+			return nil, err
+		}
 		// read out the file
 		if readBytes == 0 {
 			break
@@ -180,9 +183,6 @@ func readLastValidLog(ctx context.Context, file *os.File, tryLines int) (*pb.Log
 		tried += len(lines)
 		if tried >= tryLines {
 			break
-		}
-		if isCtxDone(ctx) {
-			return nil, ctx.Err()
 		}
 	}
 	return nil, errors.New("not a valid log file")
@@ -204,8 +204,8 @@ func readLine(reader *bufio.Reader) (string, error) {
 }
 
 // Read lines from the end of a file
-// endCursor initial value should be the filesize
-func readLastLines(file *os.File, endCursor int64) ([]string, int) {
+// endCursor initial value should be the file size
+func readLastLines(ctx context.Context, file *os.File, endCursor int64) ([]string, int, error) {
 	var lines []byte
 	var firstNonNewlinePos int
 	var cursor = endCursor
@@ -222,9 +222,15 @@ func readLastLines(file *os.File, endCursor int64) ([]string, int) {
 		}
 		cursor -= size
 
-		file.Seek(cursor, io.SeekStart)
+		_, err := file.Seek(cursor, io.SeekStart)
+		if err != nil {
+			return nil, 0, ctx.Err()
+		}
 		chars := make([]byte, size)
-		file.Read(chars)
+		_, err = file.Read(chars)
+		if err != nil {
+			return nil, 0, ctx.Err()
+		}
 		lines = append(chars, lines...)
 
 		// find first '\n' or '\r'
@@ -242,9 +248,12 @@ func readLastLines(file *os.File, endCursor int64) ([]string, int) {
 		if firstNonNewlinePos > 0 {
 			break
 		}
+		if isCtxDone(ctx) {
+			return nil, 0, ctx.Err()
+		}
 	}
 	finalStr := string(lines[firstNonNewlinePos:])
-	return strings.Split(strings.ReplaceAll(finalStr, "\r\n", "\n"), "\n"), len(finalStr)
+	return strings.Split(strings.ReplaceAll(finalStr, "\r\n", "\n"), "\n"), len(finalStr), nil
 }
 
 // ParseLogLevel returns LogLevel from string and return LogLevel_Info if
