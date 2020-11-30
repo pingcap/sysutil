@@ -52,7 +52,6 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 	logDir := filepath.Dir(logFilePath)
 	ext := filepath.Ext(logFilePath)
 	filePrefix := logFilePath[:len(logFilePath)-len(ext)]
-	fmt.Printf("prefix: %v, ext: %v --\n", filePrefix, ext)
 	err := filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -108,8 +107,6 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		}
 		return nil
 	})
-
-	fmt.Printf("resolve log finish   %v--\n", time.Now())
 
 	defer func() {
 		for _, f := range skipFiles {
