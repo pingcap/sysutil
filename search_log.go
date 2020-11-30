@@ -253,7 +253,7 @@ func ParseLogLevel(s string) pb.LogLevel {
 func parseLogItem(s string) (*pb.LogMessage, error) {
 	timeLeftBound := strings.Index(s, "[")
 	timeRightBound := strings.Index(s, "]")
-	if timeLeftBound == -1 || timeRightBound == -1 {
+	if timeLeftBound == -1 || timeRightBound == -1 || timeLeftBound > timeRightBound {
 		return nil, fmt.Errorf("invalid log string: %s", s)
 	}
 	time, err := parseTimeStamp(s[timeLeftBound+1 : timeRightBound])
