@@ -619,6 +619,30 @@ func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
 	}
 }
 
+func (s *searchLogSuite) BenchmarkReadLastLinesOfHugeLine(c *C) {
+	// step 1. initial a huge line log file
+	hugeLine := make([]byte, 1024*1024*10)
+	for i := range hugeLine {
+		hugeLine[i] = 'a' + byte(i%26)
+	}
+	s.writeTmpFile(c, "tidb.log", []string{string(hugeLine)})
+
+	// step 2. open it as read only mode
+	path := filepath.Join(s.tmpDir, "tidb.log")
+	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+	c.Assert(err, IsNil, Commentf("open file %s failed", path))
+	defer file.Close()
+
+	stat, _ := file.Stat()
+	filesize := stat.Size()
+
+	// step 3. start to benchmark
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		sysutil.ReadLastLines(context.Background(), file, filesize)
+	}
+}
+
 // run benchmark by `go test -check.b`
 // result:
 // searchLogSuite.BenchmarkReadLastLines      1000000              2008 ns/op
