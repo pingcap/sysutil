@@ -15,9 +15,11 @@ package sysutil
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -41,7 +43,7 @@ func (l *logFile) EndTime() int64 {
 	return l.end
 }
 
-func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, error) {
+func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime int64) ([]logFile, error) {
 	if logFilePath == "" {
 		return nil, errors.New("empty log file location configuration")
 	}
@@ -51,10 +53,11 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 	logDir := filepath.Dir(logFilePath)
 	ext := filepath.Ext(logFilePath)
 	filePrefix := logFilePath[:len(logFilePath)-len(ext)]
-	err := filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	files, err := ioutil.ReadDir(logDir)
+	if err != nil {
+		return nil, err
+	}
+	walkFn := func(path string, info os.FileInfo) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -65,6 +68,9 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		if !strings.HasSuffix(path, ext) {
 			return nil
 		}
+		if isCtxDone(ctx) {
+			return ctx.Err()
+		}
 		// If we cannot open the file, we skip to search the file instead of returning
 		// error and abort entire searching task.
 		// TODO: do we need to return some warning to client?
@@ -74,13 +80,13 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 		}
 		reader := bufio.NewReader(file)
 
-		firstItem, err := readFirstValidLog(reader, 10)
+		firstItem, err := readFirstValidLog(ctx, reader, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
 
-		lastItem, err := readLastValidLog(file, 10)
+		lastItem, err := readLastValidLog(ctx, file, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
@@ -102,7 +108,13 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 			})
 		}
 		return nil
-	})
+	}
+	for _, file := range files {
+		err := walkFn(filepath.Join(logDir, file.Name()), file)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	defer func() {
 		for _, f := range skipFiles {
@@ -117,7 +129,16 @@ func resolveFiles(logFilePath string, beginTime, endTime int64) ([]logFile, erro
 	return logFiles, err
 }
 
-func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, error) {
+func isCtxDone(ctx context.Context) bool {
+	select {
+	case <-ctx.Done():
+		return true
+	default:
+		return false
+	}
+}
+
+func readFirstValidLog(ctx context.Context, reader *bufio.Reader, tryLines int64) (*pb.LogMessage, error) {
 	var tried int64
 	for {
 		line, err := readLine(reader)
@@ -132,16 +153,22 @@ func readFirstValidLog(reader *bufio.Reader, tryLines int64) (*pb.LogMessage, er
 		if tried >= tryLines {
 			break
 		}
+		if isCtxDone(ctx) {
+			return nil, ctx.Err()
+		}
 	}
 	return nil, errors.New("not a valid log file")
 }
 
-func readLastValidLog(file *os.File, tryLines int) (*pb.LogMessage, error) {
+func readLastValidLog(ctx context.Context, file *os.File, tryLines int) (*pb.LogMessage, error) {
 	var tried int
 	stat, _ := file.Stat()
 	endCursor := stat.Size()
 	for {
-		lines, readBytes := readLastLines(file, endCursor)
+		lines, readBytes, err := readLastLines(ctx, file, endCursor)
+		if err != nil {
+			return nil, err
+		}
 		// read out the file
 		if readBytes == 0 {
 			break
@@ -177,8 +204,8 @@ func readLine(reader *bufio.Reader) (string, error) {
 }
 
 // Read lines from the end of a file
-// endCursor initial value should be the filesize
-func readLastLines(file *os.File, endCursor int64) ([]string, int) {
+// endCursor initial value should be the file size
+func readLastLines(ctx context.Context, file *os.File, endCursor int64) ([]string, int, error) {
 	var lines []byte
 	var firstNonNewlinePos int
 	var cursor = endCursor
@@ -195,9 +222,15 @@ func readLastLines(file *os.File, endCursor int64) ([]string, int) {
 		}
 		cursor -= size
 
-		file.Seek(cursor, io.SeekStart)
+		_, err := file.Seek(cursor, io.SeekStart)
+		if err != nil {
+			return nil, 0, ctx.Err()
+		}
 		chars := make([]byte, size)
-		file.Read(chars)
+		_, err = file.Read(chars)
+		if err != nil {
+			return nil, 0, ctx.Err()
+		}
 		lines = append(chars, lines...)
 
 		// find first '\n' or '\r'
@@ -215,9 +248,12 @@ func readLastLines(file *os.File, endCursor int64) ([]string, int) {
 		if firstNonNewlinePos > 0 {
 			break
 		}
+		if isCtxDone(ctx) {
+			return nil, 0, ctx.Err()
+		}
 	}
 	finalStr := string(lines[firstNonNewlinePos:])
-	return strings.Split(strings.ReplaceAll(finalStr, "\r\n", "\n"), "\n"), len(finalStr)
+	return strings.Split(strings.ReplaceAll(finalStr, "\r\n", "\n"), "\n"), len(finalStr), nil
 }
 
 // ParseLogLevel returns LogLevel from string and return LogLevel_Info if
@@ -311,7 +347,7 @@ func (iter *logIterator) close() {
 	}
 }
 
-func (iter *logIterator) next() (*pb.LogMessage, error) {
+func (iter *logIterator) next(ctx context.Context) (*pb.LogMessage, error) {
 	// initial state
 	if iter.reader == nil {
 		if len(iter.pending) == 0 {
@@ -322,6 +358,9 @@ func (iter *logIterator) next() (*pb.LogMessage, error) {
 
 nextLine:
 	for {
+		if isCtxDone(ctx) {
+			return nil, ctx.Err()
+		}
 		line, err := readLine(iter.reader)
 		// Switch to next log file
 		if err != nil && err == io.EOF {
