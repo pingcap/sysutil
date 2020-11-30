@@ -338,7 +338,7 @@ func (iter *logIterator) close() {
 	}
 }
 
-func (iter *logIterator) next() (*pb.LogMessage, error) {
+func (iter *logIterator) next(ctx context.Context) (*pb.LogMessage, error) {
 	// initial state
 	if iter.reader == nil {
 		if len(iter.pending) == 0 {
@@ -349,6 +349,9 @@ func (iter *logIterator) next() (*pb.LogMessage, error) {
 
 nextLine:
 	for {
+		if isCtxDone(ctx) {
+			return nil, ctx.Err()
+		}
 		line, err := readLine(iter.reader)
 		// Switch to next log file
 		if err != nil && err == io.EOF {
