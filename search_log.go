@@ -19,6 +19,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"io/ioutil"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -52,10 +53,11 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 	logDir := filepath.Dir(logFilePath)
 	ext := filepath.Ext(logFilePath)
 	filePrefix := logFilePath[:len(logFilePath)-len(ext)]
-	err := filepath.Walk(logDir, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
+	files, err := ioutil.ReadDir(logDir)
+	if err != nil {
+		return nil, err
+	}
+	walkFn := func(path string, info os.FileInfo) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -106,7 +108,13 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 			})
 		}
 		return nil
-	})
+	}
+	for _, file := range files {
+		err := walkFn(filepath.Join(logDir, file.Name()), file)
+		if err != nil {
+			return nil, err
+		}
+	}
 
 	defer func() {
 		for _, f := range skipFiles {

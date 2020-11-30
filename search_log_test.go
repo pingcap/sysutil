@@ -192,7 +192,7 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 		c.Assert(err, IsNil)
 		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
 		c.Assert(err, IsNil)
-		logFiles, err := sysutil.ResolveFiles(filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime)
+		logFiles, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime)
 		c.Assert(err, IsNil)
 		c.Assert(len(logFiles), Equals, len(cas.expect), Commentf("search range (index: %d): %+v", i, cas.search))
 
