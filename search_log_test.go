@@ -28,6 +28,7 @@ import (
 	. "github.com/pingcap/check"
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/pingcap/sysutil"
+	"github.com/pingcap/sysutil/cache"
 	"google.golang.org/grpc"
 )
 
@@ -187,12 +188,13 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 		},
 	}
 
+	ca := cache.NewLogFileMetaCache()
 	for i, cas := range cases {
 		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
 		c.Assert(err, IsNil)
 		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
 		c.Assert(err, IsNil)
-		logFiles, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime)
+		logFiles, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime, ca)
 		c.Assert(err, IsNil)
 		c.Assert(len(logFiles), Equals, len(cas.expect), Commentf("search range (index: %d): %+v", i, cas.search))
 
@@ -205,6 +207,7 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 			c.Assert(endTime, Equals, logFiles[j].EndTime(), Commentf("case index: %d, expect index: %v", i, j))
 		}
 	}
+	c.Assert(ca.Len(), Equals, 5)
 }
 
 func (s *searchLogSuite) TestLogIterator(c *C) {
