@@ -29,6 +29,13 @@ func NewLogFileMetaCache() *LogFileMetaCache {
 	}
 }
 
+func NewLogFileMetaCacheWithCap(cap int) *LogFileMetaCache {
+	return &LogFileMetaCache{
+		cache:    make(map[string]*LogFileMeta),
+		capacity: cap,
+	}
+}
+
 func (c *LogFileMetaCache) GetFileMata(stat os.FileInfo) *LogFileMeta {
 	if stat == nil {
 		return nil
@@ -77,10 +84,6 @@ func NewLogFileMeta(info os.FileInfo) *LogFileMeta {
 	return &LogFileMeta{
 		ModTime: info.ModTime(),
 	}
-}
-
-func (l *LogFileMeta) SetEndTime(end time.Time) {
-	l.endTime = end
 }
 
 func (l *LogFileMeta) GetStartTime(stat os.FileInfo, getStartTime func() (time.Time, error)) (time.Time, error) {

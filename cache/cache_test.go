@@ -49,7 +49,10 @@ func (s *testCacheSuite) TestLogFileMetaGetStartTime(c *C) {
 	c.Assert(m.ModTime, Equals, stat.ModTime())
 
 	// Test GetStartTime meet error
-	_, err := m.GetStartTime(stat, func() (time.Time, error) {
+	_, err := m.GetStartTime(stat, nil)
+	c.Assert(err.Error(), Equals, "can't get file 'tidb.log' start time")
+
+	_, err = m.GetStartTime(stat, func() (time.Time, error) {
 		return time.Now(), fmt.Errorf("get start time meet error")
 	})
 	c.Assert(err.Error(), Equals, "get start time meet error")
@@ -121,7 +124,10 @@ func (s *testCacheSuite) TestLogFileMetaGetEndTime(c *C) {
 	c.Assert(m.ModTime, Equals, stat.ModTime())
 
 	// Test GetEndTime meet error
-	_, err := m.GetEndTime(stat, func() (time.Time, error) {
+	_, err := m.GetEndTime(stat, nil)
+	c.Assert(err.Error(), Equals, "can't get file 'tidb.log' end time")
+
+	_, err = m.GetEndTime(stat, func() (time.Time, error) {
 		return time.Now(), fmt.Errorf("get end time meet error")
 	})
 	c.Assert(err.Error(), Equals, "get end time meet error")
@@ -194,14 +200,72 @@ func (s *testCacheSuite) TestLogFileMetaCache(c *C) {
 	fileName := "tidb.log"
 	file, stat := s.prepareFile(c, fileName)
 	defer file.Close()
+
 	m := cache.NewLogFileMeta(stat)
 	ca.AddFileMataToCache(stat, m)
 	c.Assert(ca.Len(), Equals, 1)
+	m = ca.GetFileMata(stat)
+	c.Assert(m, NotNil)
+	c.Assert(m.IsInValid(), IsFalse)
+	c.Assert(m.CheckFileNotModified(stat), IsTrue)
+
 	m2 := cache.NewLogFileMeta(stat)
 	ca.AddFileMataToCache(stat, m2)
 	c.Assert(ca.Len(), Equals, 1)
+	m = ca.GetFileMata(stat)
+	c.Assert(m, NotNil)
+	c.Assert(m.IsInValid(), IsFalse)
+	c.Assert(m.CheckFileNotModified(stat), IsTrue)
+
 	ca.AddFileMataToCache(nil, m)
 	c.Assert(ca.Len(), Equals, 1)
 	ca.AddFileMataToCache(stat, nil)
 	c.Assert(ca.Len(), Equals, 1)
+
+	m = ca.GetFileMata(stat)
+	c.Assert(m, NotNil)
+	c.Assert(m.IsInValid(), IsFalse)
+	c.Assert(m.CheckFileNotModified(stat), IsTrue)
+
+	m = ca.GetFileMata(nil)
+	c.Assert(m, IsNil)
+}
+
+func (s *testCacheSuite) TestLogFileMetaCacheWithCap(c *C) {
+	ca := cache.NewLogFileMetaCacheWithCap(1)
+	ca.AddFileMataToCache(nil, nil)
+	c.Assert(ca.Len(), Equals, 0)
+	fileName := "tidb.log"
+	file, stat := s.prepareFile(c, fileName)
+	defer file.Close()
+	fileName2 := "tidb2.log"
+	file2, stat2 := s.prepareFile(c, fileName2)
+	defer file2.Close()
+
+	m := cache.NewLogFileMeta(stat)
+	ca.AddFileMataToCache(stat, m)
+	c.Assert(ca.Len(), Equals, 1)
+	m = ca.GetFileMata(stat)
+	c.Assert(m, NotNil)
+	c.Assert(m.IsInValid(), IsFalse)
+	c.Assert(m.CheckFileNotModified(stat), IsTrue)
+
+	m2 := cache.NewLogFileMeta(stat2)
+	ca.AddFileMataToCache(stat2, m2)
+	c.Assert(ca.Len(), Equals, 1)
+	m = ca.GetFileMata(stat2)
+	c.Assert(m, IsNil)
+
+	m = ca.GetFileMata(stat)
+	c.Assert(m, NotNil)
+	c.Assert(m.IsInValid(), IsFalse)
+	c.Assert(m.CheckFileNotModified(stat), IsTrue)
+
+	_, err := file.WriteString("abc")
+	c.Assert(err, IsNil)
+	stat, err = file.Stat()
+	c.Assert(err, IsNil)
+	m = ca.GetFileMata(stat)
+	c.Assert(m, NotNil)
+	c.Assert(m.CheckFileNotModified(stat), IsFalse)
 }
