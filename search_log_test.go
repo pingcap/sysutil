@@ -20,10 +20,13 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"path/filepath"
 	"strings"
 	"time"
+
+	_ "net/http/pprof"
 
 	. "github.com/pingcap/check"
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
@@ -56,6 +59,10 @@ func (s *searchLogSuite) SetUpSuite(c *C) {
 	s.address = fmt.Sprintf(":%d", listener.Addr().(*net.TCPAddr).Port)
 
 	go func() {
+		log.Println(http.ListenAndServe("localhost:10091", nil))
+	}()
+
+	go func() {
 		if err := server.Serve(listener); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
@@ -72,7 +79,7 @@ func (s *searchLogSuite) writeTmpFile(c *C, filename string, lines []string) {
 	c.Assert(err, IsNil, Commentf("write tmp file %s failed", filename))
 }
 
-func (s *searchLogSuite) TestResoveFiles(c *C) {
+func (s *searchLogSuite) prepareLogFiles(c *C) {
 	s.writeTmpFile(c, "tidb.log", []string{
 		`20/08/26 06:19:13.011 -04:00 [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`hello TiDB`,
@@ -105,6 +112,10 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
+}
+
+func (s *searchLogSuite) TestResoveFiles(c *C) {
+	s.prepareLogFiles(c)
 
 	type timeRange struct{ start, end string }
 	cases := []struct {
@@ -643,6 +654,25 @@ func (s *searchLogSuite) BenchmarkReadLastLinesOfHugeLine(c *C) {
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
 		sysutil.ReadLastLines(context.Background(), file, filesize)
+	}
+}
+
+func (s *searchLogSuite) BenchmarkResolveFiles(c *C) {
+	s.prepareLogFiles(c)
+
+	ca := cache.NewLogFileMetaCache()
+	beginTime, err := sysutil.ParseTimeStamp("2019/08/26 06:19:13.011 -04:00")
+	c.Assert(err, IsNil)
+	endTime, err := sysutil.ParseTimeStamp("2019/08/26 06:22:17.011 -04:00")
+	c.Assert(err, IsNil)
+	path := filepath.Join(s.tmpDir, "tidb.log")
+	c.ResetTimer()
+	//for i := 0; i < c.N; i++ {
+	fmt.Printf("---------start------\n\n")
+	for i := 0; i < 500000; i++ {
+		logFiles, err := sysutil.ResolveFiles(context.Background(), path, beginTime, endTime, ca)
+		c.Assert(err, IsNil)
+		c.Assert(len(logFiles), Equals, 4)
 	}
 }
 
