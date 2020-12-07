@@ -83,7 +83,6 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		if err != nil {
 			return nil
 		}
-		reader := bufio.NewReader(file)
 
 		stat, err := file.Stat()
 		if err != nil {
@@ -100,6 +99,7 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		}
 
 		firstTime, err := meta.GetStartTime(stat, func() (time.Time, error) {
+			reader := bufio.NewReader(file)
 			firstItem, err := readFirstValidLog(ctx, reader, 10)
 			if err != nil {
 				return time.Time{}, err
