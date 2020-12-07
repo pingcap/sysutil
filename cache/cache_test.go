@@ -12,7 +12,7 @@ import (
 	"github.com/pingcap/sysutil/cache"
 )
 
-var _ = Suite(&testCacheSuite{})
+var _ = SerialSuites(&testCacheSuite{})
 
 func TestT(t *testing.T) {
 	TestingT(t)
