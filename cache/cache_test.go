@@ -43,8 +43,10 @@ func (s *testCacheSuite) prepareFile(c *C, fileName string) (*os.File, os.FileIn
 
 func (s *testCacheSuite) writeAndReopen(c *C, file *os.File, data string) (*os.File, os.FileInfo) {
 	// mock delay.
-	time.Sleep(time.Microsecond)
+	time.Sleep(time.Millisecond)
 	_, err := file.WriteString(data)
+	c.Assert(err, IsNil)
+	err = file.Sync()
 	c.Assert(err, IsNil)
 	stat, err := file.Stat()
 	c.Assert(err, IsNil)
