@@ -47,9 +47,10 @@ func (s *testCacheSuite) writeAndReopen(c *C, file *os.File, data string) (*os.F
 	name := stat.Name()
 	err = file.Close()
 	c.Assert(err, IsNil)
-	time.Sleep(time.Millisecond * 10)
 	file, stat = s.prepareFile(c, name)
 	_, err = file.WriteString(data)
+	c.Assert(err, IsNil)
+	err = file.Sync()
 	c.Assert(err, IsNil)
 	err = file.Close()
 	c.Assert(err, IsNil)
@@ -96,7 +97,7 @@ func (s *testCacheSuite) TestLogFileMetaGetStartTime(c *C) {
 	c.Assert(err.Error(), Equals, "file stat can't be nil")
 
 	// Test file has been modified.
-	file, stat = s.writeAndReopen(c, file, "a")
+	file, stat = s.writeAndReopen(c, file, "[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] [\"Welcome to TiDB.\"]")
 
 	// Test GetStartTime meet invalid error
 	_, err = m.GetStartTime(stat, func() (time.Time, error) {
@@ -169,7 +170,7 @@ func (s *testCacheSuite) TestLogFileMetaGetEndTime(c *C) {
 	c.Assert(err.Error(), Equals, "file stat can't be nil")
 
 	// Test file has been modified.
-	file, stat = s.writeAndReopen(c, file, "a")
+	file, stat = s.writeAndReopen(c, file, "[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] [\"Welcome to TiDB.\"]")
 
 	// Test GetEndTime meet invalid error
 	_, err = m.GetEndTime(stat, func() (time.Time, error) {
@@ -271,7 +272,7 @@ func (s *testCacheSuite) TestLogFileMetaCacheWithCap(c *C) {
 	c.Assert(m.CheckFileNotModified(stat), IsTrue)
 
 	fmt.Printf("old mod time: \n%v\n%v -%v--\n", stat.ModTime(), m.ModTime, stat.Size())
-	file, stat = s.writeAndReopen(c, file, "abc")
+	file, stat = s.writeAndReopen(c, file, "[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] [\"Welcome to TiDB.\"]")
 	fmt.Printf("new mod time: \n%v\n%v -%v--\n", stat.ModTime(), m.ModTime, stat.Size())
 	m = ca.GetFileMata(stat)
 	c.Assert(m, NotNil)
