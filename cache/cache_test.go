@@ -46,11 +46,12 @@ func (s *testCacheSuite) writeAndReopen(c *C, file *os.File, data string) (*os.F
 	time.Sleep(time.Millisecond)
 	_, err := file.WriteString(data)
 	c.Assert(err, IsNil)
-	err = file.Sync()
-	c.Assert(err, IsNil)
 	stat, err := file.Stat()
 	c.Assert(err, IsNil)
-	return file, stat
+	name := stat.Name()
+	err = file.Close()
+	c.Assert(err, IsNil)
+	return s.prepareFile(c, name)
 }
 
 func (s *testCacheSuite) TestLogFileMetaGetStartTime(c *C) {
