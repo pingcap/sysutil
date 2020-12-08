@@ -83,6 +83,8 @@ func (s *testCacheSuite) TestLogFileMetaGetStartTime(c *C) {
 	// Test file has been modified.
 	_, err = file.WriteString("a")
 	c.Assert(err, IsNil)
+	err = file.Sync()
+	c.Assert(err, IsNil)
 	stat, err = file.Stat()
 	c.Assert(err, IsNil)
 
@@ -158,6 +160,8 @@ func (s *testCacheSuite) TestLogFileMetaGetEndTime(c *C) {
 
 	// Test file has been modified.
 	_, err = file.WriteString("a")
+	c.Assert(err, IsNil)
+	err = file.Sync()
 	c.Assert(err, IsNil)
 	stat, err = file.Stat()
 	c.Assert(err, IsNil)
@@ -262,6 +266,8 @@ func (s *testCacheSuite) TestLogFileMetaCacheWithCap(c *C) {
 	c.Assert(m.CheckFileNotModified(stat), IsTrue)
 
 	_, err := file.WriteString("abc")
+	c.Assert(err, IsNil)
+	err = file.Sync()
 	c.Assert(err, IsNil)
 	stat, err = file.Stat()
 	c.Assert(err, IsNil)
