@@ -47,6 +47,7 @@ func (s *testCacheSuite) writeAndReopen(c *C, file *os.File, data string) (*os.F
 	name := stat.Name()
 	err = file.Close()
 	c.Assert(err, IsNil)
+	time.Sleep(time.Millisecond * 10)
 	file, stat = s.prepareFile(c, name)
 	_, err = file.WriteString(data)
 	c.Assert(err, IsNil)
