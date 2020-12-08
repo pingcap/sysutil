@@ -44,14 +44,11 @@ func (s *testCacheSuite) prepareFile(c *C, fileName string) (*os.File, os.FileIn
 func (s *testCacheSuite) writeAndReopen(c *C, file *os.File, data string) (*os.File, os.FileInfo) {
 	// mock delay.
 	time.Sleep(time.Microsecond)
+	_, err := file.WriteString(data)
+	c.Assert(err, IsNil)
 	stat, err := file.Stat()
 	c.Assert(err, IsNil)
-	name := stat.Name()
-	_, err = file.WriteString(data)
-	c.Assert(err, IsNil)
-	err = file.Close()
-	c.Assert(err, IsNil)
-	return s.prepareFile(c, name)
+	return file, stat
 }
 
 func (s *testCacheSuite) TestLogFileMetaGetStartTime(c *C) {
@@ -268,9 +265,7 @@ func (s *testCacheSuite) TestLogFileMetaCacheWithCap(c *C) {
 	c.Assert(m.IsInValid(), IsFalse)
 	c.Assert(m.CheckFileNotModified(stat), IsTrue)
 
-	fmt.Printf("old mod time: \n%v\n%v -%v--\n", stat.ModTime(), m.ModTime, stat.Size())
 	file, stat = s.writeAndReopen(c, file, "[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] [\"Welcome to TiDB.\"]")
-	fmt.Printf("new mod time: \n%v\n%v -%v--\n", stat.ModTime(), m.ModTime, stat.Size())
 	m = ca.GetFileMata(stat)
 	c.Assert(m, NotNil)
 	c.Assert(m.CheckFileNotModified(stat), IsFalse)
