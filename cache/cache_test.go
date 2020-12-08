@@ -268,7 +268,9 @@ func (s *testCacheSuite) TestLogFileMetaCacheWithCap(c *C) {
 	c.Assert(m.IsInValid(), IsFalse)
 	c.Assert(m.CheckFileNotModified(stat), IsTrue)
 
+	fmt.Printf("old mod time: \n%v\n%v -%v--\n", stat.ModTime(), m.ModTime, stat.Size())
 	file, stat = s.writeAndReopen(c, file, "[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] [\"Welcome to TiDB.\"]")
+	fmt.Printf("new mod time: \n%v\n%v -%v--\n", stat.ModTime(), m.ModTime, stat.Size())
 	m = ca.GetFileMata(stat)
 	c.Assert(m, NotNil)
 	c.Assert(m.CheckFileNotModified(stat), IsFalse)
