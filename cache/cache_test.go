@@ -41,6 +41,17 @@ func (s *testCacheSuite) prepareFile(c *C, fileName string) (*os.File, os.FileIn
 	return file, stat
 }
 
+func (s *testCacheSuite) writeAndReopen(c *C, file *os.File, data string) (*os.File, os.FileInfo) {
+	stat, err := file.Stat()
+	c.Assert(err, IsNil)
+	name := stat.Name()
+	_, err = file.WriteString(data)
+	c.Assert(err, IsNil)
+	err = file.Close()
+	c.Assert(err, IsNil)
+	return s.prepareFile(c, name)
+}
+
 func (s *testCacheSuite) TestLogFileMetaGetStartTime(c *C) {
 	fileName := "tidb.log"
 	file, stat := s.prepareFile(c, fileName)
@@ -81,12 +92,7 @@ func (s *testCacheSuite) TestLogFileMetaGetStartTime(c *C) {
 	c.Assert(err.Error(), Equals, "file stat can't be nil")
 
 	// Test file has been modified.
-	_, err = file.WriteString("a")
-	c.Assert(err, IsNil)
-	err = file.Sync()
-	c.Assert(err, IsNil)
-	stat, err = file.Stat()
-	c.Assert(err, IsNil)
+	file, stat = s.writeAndReopen(c, file, "a")
 
 	// Test GetStartTime meet invalid error
 	_, err = m.GetStartTime(stat, func() (time.Time, error) {
@@ -159,12 +165,7 @@ func (s *testCacheSuite) TestLogFileMetaGetEndTime(c *C) {
 	c.Assert(err.Error(), Equals, "file stat can't be nil")
 
 	// Test file has been modified.
-	_, err = file.WriteString("a")
-	c.Assert(err, IsNil)
-	err = file.Sync()
-	c.Assert(err, IsNil)
-	stat, err = file.Stat()
-	c.Assert(err, IsNil)
+	file, stat = s.writeAndReopen(c, file, "a")
 
 	// Test GetEndTime meet invalid error
 	_, err = m.GetEndTime(stat, func() (time.Time, error) {
@@ -265,12 +266,7 @@ func (s *testCacheSuite) TestLogFileMetaCacheWithCap(c *C) {
 	c.Assert(m.IsInValid(), IsFalse)
 	c.Assert(m.CheckFileNotModified(stat), IsTrue)
 
-	_, err := file.WriteString("abc")
-	c.Assert(err, IsNil)
-	err = file.Sync()
-	c.Assert(err, IsNil)
-	stat, err = file.Stat()
-	c.Assert(err, IsNil)
+	file, stat = s.writeAndReopen(c, file, "abc")
 	m = ca.GetFileMata(stat)
 	c.Assert(m, NotNil)
 	c.Assert(m.CheckFileNotModified(stat), IsFalse)
