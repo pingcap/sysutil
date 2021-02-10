@@ -25,6 +25,7 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 			Tp:   "cpu",
 			Name: "cpu",
 			Pairs: []*pb.ServerInfoPair{
+				{Key: "cpu-arch", Value: fmt.Sprintf("%s", runtime.GOARCH)},
 				{Key: "cpu-logical-cores", Value: fmt.Sprintf("%d", runtime.NumCPU())},
 				{Key: "cpu-physical-cores", Value: fmt.Sprintf("%d", physicalCores)},
 				{Key: "cpu-frequency", Value: fmt.Sprintf("%.2fMHz", infos[0].Mhz)},
