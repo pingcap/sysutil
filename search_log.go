@@ -28,6 +28,7 @@ import (
 	"time"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
+	"github.com/pingcap/sysutil/cache"
 )
 
 type logFile struct {
@@ -43,9 +44,13 @@ func (l *logFile) EndTime() int64 {
 	return l.end
 }
 
-func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime int64) ([]logFile, error) {
+func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime int64, ca *cache.LogFileMetaCache) ([]logFile, error) {
 	if logFilePath == "" {
 		return nil, errors.New("empty log file location configuration")
+	}
+	if ca == nil {
+		// For test.
+		ca = cache.NewLogFileMetaCache()
 	}
 
 	var logFiles []logFile
@@ -78,15 +83,41 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		if err != nil {
 			return nil
 		}
-		reader := bufio.NewReader(file)
 
-		firstItem, err := readFirstValidLog(ctx, reader, 10)
+		stat, err := file.Stat()
+		if err != nil {
+			return nil
+		}
+		meta := ca.GetFileMata(stat)
+		if meta == nil {
+			meta = cache.NewLogFileMeta(stat)
+			defer ca.AddFileMataToCache(stat, meta)
+		} else {
+			if meta.CheckFileNotModified(stat) && meta.IsInValid() {
+				return nil
+			}
+		}
+
+		firstTime, err := meta.GetStartTime(stat, func() (time.Time, error) {
+			reader := bufio.NewReader(file)
+			firstItem, err := readFirstValidLog(ctx, reader, 10)
+			if err != nil {
+				return time.Time{}, err
+			}
+			return convertToGoTime(firstItem.Time), nil
+		})
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
 
-		lastItem, err := readLastValidLog(ctx, file, 10)
+		lastTime, err := meta.GetEndTime(stat, func() (time.Time, error) {
+			lastItem, err := readLastValidLog(ctx, file, 10)
+			if err != nil {
+				return time.Time{}, err
+			}
+			return convertToGoTime(lastItem.Time), nil
+		})
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
@@ -98,13 +129,15 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 			return nil
 		}
 
-		if beginTime > lastItem.Time || endTime < firstItem.Time {
+		fileStartTime := convertToLogTime(firstTime)
+		fileEndTime := convertToLogTime(lastTime)
+		if beginTime > fileEndTime || endTime < fileStartTime {
 			skipFiles = append(skipFiles, file)
 		} else {
 			logFiles = append(logFiles, logFile{
 				file:  file,
-				begin: firstItem.Time,
-				end:   lastItem.Time,
+				begin: fileStartTime,
+				end:   fileEndTime,
 			})
 		}
 		return nil
@@ -143,6 +176,9 @@ func readFirstValidLog(ctx context.Context, reader *bufio.Reader, tryLines int64
 	for {
 		line, err := readLine(reader)
 		if err != nil {
+			if err == io.EOF {
+				return nil, cache.InvalidLogFile
+			}
 			return nil, err
 		}
 		item, err := parseLogItem(line)
@@ -157,7 +193,7 @@ func readFirstValidLog(ctx context.Context, reader *bufio.Reader, tryLines int64
 			return nil, ctx.Err()
 		}
 	}
-	return nil, errors.New("not a valid log file")
+	return nil, cache.InvalidLogFile
 }
 
 func readLastValidLog(ctx context.Context, file *os.File, tryLines int) (*pb.LogMessage, error) {
@@ -185,7 +221,7 @@ func readLastValidLog(ctx context.Context, file *os.File, tryLines int) (*pb.Log
 			break
 		}
 	}
-	return nil, errors.New("not a valid log file")
+	return nil, cache.InvalidLogFile
 }
 
 // Read a line from a reader.
@@ -327,7 +363,15 @@ func parseTimeStamp(s string) (int64, error) {
 	if err != nil {
 		return 0, err
 	}
-	return t.UnixNano() / int64(time.Millisecond), nil
+	return convertToLogTime(t), nil
+}
+
+func convertToLogTime(t time.Time) int64 {
+	return t.UnixNano() / int64(time.Millisecond)
+}
+
+func convertToGoTime(ms int64) time.Time {
+	return time.Unix(0, ms*int64(time.Millisecond))
 }
 
 // logIterator implements Iterator and IteratorWithPeek interface.

@@ -22,15 +22,18 @@ import (
 	"sort"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
+	"github.com/pingcap/sysutil/cache"
 )
 
 type DiagnosticsServer struct {
-	logFile string
+	logFile          string
+	logFileMetaCache *cache.LogFileMetaCache
 }
 
 func NewDiagnosticsServer(logFile string) *DiagnosticsServer {
 	return &DiagnosticsServer{
-		logFile: logFile,
+		logFile:          logFile,
+		logFileMetaCache: cache.NewLogFileMetaCache(),
 	}
 }
 
@@ -43,7 +46,7 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 	}
 
 	ctx := stream.Context()
-	logFiles, err := resolveFiles(ctx, d.logFile, beginTime, endTime)
+	logFiles, err := resolveFiles(ctx, d.logFile, beginTime, endTime, d.logFileMetaCache)
 	if err != nil {
 		return err
 	}

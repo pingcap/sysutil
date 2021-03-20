@@ -28,6 +28,7 @@ import (
 	. "github.com/pingcap/check"
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/pingcap/sysutil"
+	"github.com/pingcap/sysutil/cache"
 	"google.golang.org/grpc"
 )
 
@@ -187,12 +188,13 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 		},
 	}
 
+	ca := cache.NewLogFileMetaCache()
 	for i, cas := range cases {
 		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
 		c.Assert(err, IsNil)
 		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
 		c.Assert(err, IsNil)
-		logFiles, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime)
+		logFiles, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime, ca)
 		c.Assert(err, IsNil)
 		c.Assert(len(logFiles), Equals, len(cas.expect), Commentf("search range (index: %d): %+v", i, cas.search))
 
@@ -205,6 +207,7 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 			c.Assert(endTime, Equals, logFiles[j].EndTime(), Commentf("case index: %d, expect index: %v", i, j))
 		}
 	}
+	c.Assert(ca.Len(), Equals, 5)
 }
 
 func (s *searchLogSuite) TestLogIterator(c *C) {
@@ -640,6 +643,32 @@ func (s *searchLogSuite) BenchmarkReadLastLinesOfHugeLine(c *C) {
 	c.ResetTimer()
 	for i := 0; i < c.N; i++ {
 		sysutil.ReadLastLines(context.Background(), file, filesize)
+	}
+}
+
+func (s *searchLogSuite) BenchmarkResolveFiles(c *C) {
+	for i := 0; i < 1000; i++ {
+		s.writeTmpFile(c, fmt.Sprintf("tidb-%v.log", i), []string{
+			`20/08/26 06:19:13.011 -04:00 [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			`[2019/08/26 06:19:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			`[2019/08/26 06:19:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			`[2019/08/26 06:19:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			`[2019/08/26 06:19:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			`[2019/08/26 06:19:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		})
+	}
+
+	ca := cache.NewLogFileMetaCache()
+	beginTime, err := sysutil.ParseTimeStamp("2019/08/26 06:19:13.011 -04:00")
+	c.Assert(err, IsNil)
+	endTime, err := sysutil.ParseTimeStamp("2019/08/26 06:22:17.011 -04:00")
+	c.Assert(err, IsNil)
+	path := filepath.Join(s.tmpDir, "tidb.log")
+	c.ResetTimer()
+	for i := 0; i < c.N; i++ {
+		logFiles, err := sysutil.ResolveFiles(context.Background(), path, beginTime, endTime, ca)
+		c.Assert(err, IsNil)
+		c.Assert(len(logFiles), Equals, 1000)
 	}
 }
 
