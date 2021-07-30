@@ -537,12 +537,12 @@ func (s *searchLogSuite) TestParseLogItem(c *C) {
 
 func (s *searchLogSuite) TestReadLastLinesHuge(c *C) {
 	// step 1. initial a log file with lastHugeLine
-	lastHugeLine := make([]byte,0,1024+512)
+	lastHugeLine := make([]byte, 0, 1024+512)
 	lastHugeLine = append(lastHugeLine, []byte(`[2019/08/26 06:22:20.011 -04:00] [INFO] [printer.go:41] `)...)
 	for len(lastHugeLine) < cap(lastHugeLine) {
 		if len(lastHugeLine) == 1023 || len(lastHugeLine) == cap(lastHugeLine)-1 {
 			lastHugeLine = append(lastHugeLine, '\n')
-		}else {
+		} else {
 			lastHugeLine = append(lastHugeLine, 'a')
 		}
 	}
@@ -558,10 +558,10 @@ func (s *searchLogSuite) TestReadLastLinesHuge(c *C) {
 	defer file.Close()
 
 	stat, err := file.Stat()
-	c.Assert(err,IsNil)
-	lastLines,_,err := sysutil.ReadLastLines(context.Background(),file, stat.Size())
-	c.Assert(err,IsNil)
-	c.Assert(len(lastLines),Equals,4)
+	c.Assert(err, IsNil)
+	lastLines, _, err := sysutil.ReadLastLines(context.Background(), file, stat.Size())
+	c.Assert(err, IsNil)
+	c.Assert(len(lastLines), Equals, 4)
 }
 
 func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
