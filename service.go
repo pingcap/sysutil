@@ -41,11 +41,11 @@ func NewDiagnosticsServer(logFile string) *DiagnosticsServer {
 func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagnostics_SearchLogServer) (err error) {
 	defer func() {
 		if r := recover(); r != nil {
-			err = fmt.Errorf("%s", r)
 			buf := make([]byte, 4096)
 			stackSize := runtime.Stack(buf, false)
 			buf = buf[:stackSize]
-			log.Error(fmt.Sprintf("search log panic, stack is %v", string(buf)))
+			err = fmt.Errorf(fmt.Sprintf("search log panic, error is %v, stack is %v", r, string(buf)))
+			log.Error(err.Error())
 		}
 	}()
 
