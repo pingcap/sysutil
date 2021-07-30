@@ -15,13 +15,16 @@ package sysutil
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"math"
 	"os"
 	"regexp"
+	"runtime"
 	"sort"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
+	"github.com/pingcap/log"
 )
 
 type DiagnosticsServer struct {
@@ -35,7 +38,17 @@ func NewDiagnosticsServer(logFile string) *DiagnosticsServer {
 }
 
 // SearchLog implements the DiagnosticsServer interface.
-func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagnostics_SearchLogServer) error {
+func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagnostics_SearchLogServer) (err error) {
+	defer func() {
+		if r := recover(); r != nil {
+			buf := make([]byte, 4096)
+			stackSize := runtime.Stack(buf, false)
+			buf = buf[:stackSize]
+			err = fmt.Errorf(fmt.Sprintf("search log panic, %v, stack is %v", r, string(buf)))
+			log.Error(err.Error())
+		}
+	}()
+
 	beginTime := req.StartTime
 	endTime := req.EndTime
 	if endTime == 0 {
