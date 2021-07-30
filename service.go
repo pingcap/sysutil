@@ -44,7 +44,7 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 			buf := make([]byte, 4096)
 			stackSize := runtime.Stack(buf, false)
 			buf = buf[:stackSize]
-			err = fmt.Errorf(fmt.Sprintf("search log panic, error is %v, stack is %v", r, string(buf)))
+			err = fmt.Errorf(fmt.Sprintf("search log panic, %v, stack is %v", r, string(buf)))
 			log.Error(err.Error())
 		}
 	}()
