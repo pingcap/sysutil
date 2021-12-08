@@ -305,6 +305,9 @@ func parseLogItem(s string) (*pb.LogMessage, error) {
 	}
 	levelLeftBound := strings.Index(s[timeRightBound+1:], "[")
 	levelRightBound := strings.Index(s[timeRightBound+1:], "]")
+	if levelLeftBound == -1 || levelRightBound == -1 || levelLeftBound > levelRightBound {
+		return nil, fmt.Errorf("invalid log string: %s", s)
+	}
 	level := ParseLogLevel(s[timeRightBound+1+levelLeftBound+1 : timeRightBound+1+levelRightBound])
 	item := &pb.LogMessage{
 		Time:    time,

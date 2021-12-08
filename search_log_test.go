@@ -214,6 +214,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 		`This is an invalid log blablabla][`,
+		`[2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 		`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
@@ -261,6 +262,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla][`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
@@ -282,6 +284,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla][`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
@@ -305,6 +308,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla][`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 			},
 		},
@@ -332,6 +336,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla][`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 				`[2019/08/26 06:19:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
@@ -357,6 +362,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla][`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 			},
 		},
 		// 7
@@ -367,6 +373,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 				`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla][`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 			},
 		},
 		// 8
@@ -376,6 +383,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 			expect: []string{
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] This is an invalid log blablabla][`,
+				`[2019/08/26 06:19:16.011 -04:00] [DEBUG] [2019/08/26 06:19:17.011 -04:00] ] [INFO] invalid log"]`,
 			},
 		},
 		// 9
