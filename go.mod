@@ -5,6 +5,7 @@ go 1.16
 require (
 	github.com/pingcap/check v0.0.0-20191107115940-caf2b9e6ccf4
 	github.com/pingcap/errors v0.11.5-0.20190809092503-95897b64e011 // indirect
+	github.com/pingcap/failpoint v0.0.0-20210918120811-547c13e3eb00 // indirect
 	github.com/pingcap/kvproto v0.0.0-20191211054548-3c6b38ea5107
 	github.com/pingcap/log v0.0.0-20210625125904-98ed8e2eb1c7
 	github.com/pkg/errors v0.9.1 // indirect
