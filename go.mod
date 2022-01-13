@@ -1,6 +1,6 @@
 module github.com/pingcap/sysutil
 
-go 1.13
+go 1.16
 
 require (
 	github.com/pingcap/check v0.0.0-20191107115940-caf2b9e6ccf4
