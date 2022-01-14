@@ -6,10 +6,10 @@ import (
 	"strings"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
-	"github.com/shirou/gopsutil/cpu"
-	"github.com/shirou/gopsutil/disk"
-	"github.com/shirou/gopsutil/mem"
-	"github.com/shirou/gopsutil/net"
+	"github.com/shirou/gopsutil/v3/cpu"
+	"github.com/shirou/gopsutil/v3/disk"
+	"github.com/shirou/gopsutil/v3/mem"
+	"github.com/shirou/gopsutil/v3/net"
 )
 
 func getHardwareInfo() []*pb.ServerInfoItem {
@@ -62,7 +62,7 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 				Name: p.Device[5:],
 				Pairs: []*pb.ServerInfoPair{
 					{Key: "fstype", Value: p.Fstype},
-					{Key: "opts", Value: p.Opts},
+					{Key: "opts", Value: strings.Join(p.Opts, ",")},
 					{Key: "path", Value: p.Mountpoint},
 					{Key: "total", Value: fmt.Sprintf("%d", usage.Total)},
 					{Key: "free", Value: fmt.Sprintf("%d", usage.Free)},

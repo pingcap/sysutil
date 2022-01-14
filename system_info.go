@@ -12,7 +12,7 @@ import (
 	"strings"
 
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
-	"github.com/shirou/gopsutil/process"
+	"github.com/shirou/gopsutil/v3/process"
 )
 
 func tryProcFs() []*pb.ServerInfoItem {
@@ -120,7 +120,13 @@ func getProcessList() []*pb.ServerInfoItem {
 				{Key: "cmd", Value: prop(p.Cmdline)},
 				{Key: "cwd", Value: prop(p.Cwd)},
 				{Key: "start-time", Value: fmt.Sprintf("%d", ct)},
-				{Key: "status", Value: prop(p.Status)},
+				{Key: "status", Value: prop(func() (string, error) {
+					s, err := p.Status()
+					if err != nil {
+						return "", err
+					}
+					return strings.Join(s, ","), err
+				})},
 				{Key: "cpu-usage", Value: fmt.Sprintf("%.2f", us)},
 			},
 		})
