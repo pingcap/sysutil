@@ -8,6 +8,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -21,9 +22,9 @@ import (
 	"testing"
 	"time"
 
-	. "github.com/pingcap/check"
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/pingcap/sysutil"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -32,19 +33,15 @@ type serviceSuite struct {
 	address string
 }
 
-var _ = Suite(&serviceSuite{})
+func createServiceSuite(t *testing.T) (*serviceSuite, func()) {
+	s := new(serviceSuite)
 
-func TestT(t *testing.T) {
-	TestingT(t)
-}
-
-func (s *serviceSuite) SetUpSuite(c *C) {
 	server := grpc.NewServer()
 	pb.RegisterDiagnosticsServer(server, &sysutil.DiagnosticsServer{})
 
 	// Find a available port
 	listener, err := net.Listen("tcp", ":0")
-	c.Assert(err, IsNil, Commentf("cannot find available port"))
+	require.NoError(t, err, "cannot find available port")
 
 	s.server = server
 	s.address = fmt.Sprintf(":%d", listener.Addr().(*net.TCPAddr).Port)
@@ -54,18 +51,23 @@ func (s *serviceSuite) SetUpSuite(c *C) {
 			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
+
+	return s, func() {
+		s.server.Stop()
+	}
 }
 
-func (s *serviceSuite) TearDownSuite(c *C) {
-	s.server.Stop()
-}
+func TestRPCServerInfo(t *testing.T) {
+	s, clean := createServiceSuite(t)
+	defer clean()
 
-func (s *serviceSuite) TestRPCServerInfo(c *C) {
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(s.address, grpc.WithInsecure())
-	c.Assert(err, IsNil)
+	require.NoError(t, err)
 
-	defer conn.Close()
+	defer func() {
+		require.NoError(t, conn.Close())
+	}()
 	client := pb.NewDiagnosticsClient(conn)
 
 	// Contact the server and print out its response.
@@ -74,19 +76,19 @@ func (s *serviceSuite) TestRPCServerInfo(c *C) {
 
 	// Test for load info.
 	r, err := client.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_LoadInfo})
-	c.Assert(err, IsNil)
-	c.Assert(r, NotNil)
-	c.Assert(len(r.Items), Not(Equals), 0)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotZero(t, len(r.Items))
 
 	// Test for hardware info.
 	r, err = client.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_HardwareInfo})
-	c.Assert(err, IsNil)
-	c.Assert(r, NotNil)
-	c.Assert(len(r.Items), Not(Equals), 0)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotZero(t, len(r.Items))
 
 	// Test for system info.
 	r, err = client.ServerInfo(ctx, &pb.ServerInfoRequest{Tp: pb.ServerInfoType_SystemInfo})
-	c.Assert(err, IsNil)
-	c.Assert(r, NotNil)
-	c.Assert(len(r.Items), Not(Equals), 0)
+	require.NoError(t, err)
+	require.NotNil(t, r)
+	require.NotZero(t, len(r.Items))
 }

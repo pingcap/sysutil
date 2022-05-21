@@ -8,6 +8,7 @@
 //
 // Unless required by applicable law or agreed to in writing, software
 // distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
@@ -23,11 +24,12 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"testing"
 	"time"
 
-	. "github.com/pingcap/check"
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/pingcap/sysutil"
+	"github.com/stretchr/testify/require"
 	"google.golang.org/grpc"
 )
 
@@ -37,19 +39,18 @@ type searchLogSuite struct {
 	tmpDir  string
 }
 
-var _ = Suite(&searchLogSuite{})
-
-func (s *searchLogSuite) SetUpSuite(c *C) {
+func createSearchLogSuite(t testing.TB) (*searchLogSuite, func()) {
 	tmpDir, err := ioutil.TempDir("", "sysutil")
-	c.Assert(err, IsNil)
+	require.NoError(t, err)
 
 	server := grpc.NewServer()
 	pb.RegisterDiagnosticsServer(server, sysutil.NewDiagnosticsServer(filepath.Join(tmpDir, "rpc.tidb.log")))
 
 	// Find a available port
 	listener, err := net.Listen("tcp", ":0")
-	c.Assert(err, IsNil, Commentf("cannot find available port"))
+	require.NoError(t, err, "cannot find available port")
 
+	s := new(searchLogSuite)
 	s.tmpDir = tmpDir
 	s.server = server
 	s.address = fmt.Sprintf(":%d", listener.Addr().(*net.TCPAddr).Port)
@@ -59,20 +60,23 @@ func (s *searchLogSuite) SetUpSuite(c *C) {
 			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
+
+	return s, func() {
+		s.server.Stop()
+		require.NoError(t, os.RemoveAll(s.tmpDir), fmt.Sprintf("remote tmpDir %v failed", s.tmpDir))
+	}
 }
 
-func (s *searchLogSuite) TearDownSuite(c *C) {
-	s.server.Stop()
-	c.Assert(os.RemoveAll(s.tmpDir), IsNil, Commentf("remote tmpDir %v failed", s.tmpDir))
-}
-
-func (s *searchLogSuite) writeTmpFile(c *C, filename string, lines []string) {
+func (s *searchLogSuite) writeTmpFile(t testing.TB, filename string, lines []string) {
 	err := ioutil.WriteFile(filepath.Join(s.tmpDir, filename), []byte(strings.Join(lines, "\n")), os.ModePerm)
-	c.Assert(err, IsNil, Commentf("write tmp file %s failed", filename))
+	require.NoError(t, err, fmt.Sprintf("write tmp file %s failed", filename))
 }
 
-func (s *searchLogSuite) TestResoveFiles(c *C) {
-	s.writeTmpFile(c, "tidb.log", []string{
+func TestResolveFiles(t *testing.T) {
+	s, clean := createSearchLogSuite(t)
+	defer clean()
+
+	s.writeTmpFile(t, "tidb.log", []string{
 		`20/08/26 06:19:13.011 -04:00 [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`hello TiDB`,
 		`[2019/08/26 06:19:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -85,19 +89,19 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 	})
 
 	// single line file
-	s.writeTmpFile(c, "tidb-1.log", []string{
+	s.writeTmpFile(t, "tidb-1.log", []string{
 		`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// two lines file
-	s.writeTmpFile(c, "tidb-2.log", []string{
+	s.writeTmpFile(t, "tidb-2.log", []string{
 		`[2019/08/26 06:21:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// empty file
-	s.writeTmpFile(c, "tidb-3.log", []string{``})
-	s.writeTmpFile(c, "tidb-4.log", []string{
+	s.writeTmpFile(t, "tidb-3.log", []string{``})
+	s.writeTmpFile(t, "tidb-4.log", []string{
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -189,26 +193,29 @@ func (s *searchLogSuite) TestResoveFiles(c *C) {
 
 	for i, cas := range cases {
 		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
-		c.Assert(err, IsNil)
+		require.NoError(t, err)
 		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
-		c.Assert(err, IsNil)
+		require.NoError(t, err)
 		logFiles, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "tidb.log"), beginTime, endTime)
-		c.Assert(err, IsNil)
-		c.Assert(len(logFiles), Equals, len(cas.expect), Commentf("search range (index: %d): %+v", i, cas.search))
+		require.NoError(t, err)
+		require.Len(t, logFiles, len(cas.expect), fmt.Sprintf("search range (index: %d): %+v", i, cas.search))
 
 		for j, exp := range cas.expect {
 			beginTime, err := sysutil.ParseTimeStamp(exp.start)
-			c.Assert(err, IsNil)
+			require.NoError(t, err)
 			endTime, err := sysutil.ParseTimeStamp(exp.end)
-			c.Assert(err, IsNil)
-			c.Assert(beginTime, Equals, logFiles[j].BeginTime(), Commentf("case index: %d, expect index: %v", i, j))
-			c.Assert(endTime, Equals, logFiles[j].EndTime(), Commentf("case index: %d, expect index: %v", i, j))
+			require.NoError(t, err)
+			require.Equal(t, logFiles[j].BeginTime(), beginTime, fmt.Sprintf("case index: %d, expect index: %v", i, j))
+			require.Equal(t, logFiles[j].EndTime(), endTime, fmt.Sprintf("case index: %d, expect index: %v", i, j))
 		}
 	}
 }
 
-func (s *searchLogSuite) TestLogIterator(c *C) {
-	s.writeTmpFile(c, "rpc.tidb.log", []string{
+func TestLogIterator(t *testing.T) {
+	s, clean := createSearchLogSuite(t)
+	defer clean()
+
+	s.writeTmpFile(t, "rpc.tidb.log", []string{
 		`[2019/08/26 06:19:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:19:15.011 -04:00] [ERROR] [printer.go:41] ["Welcome to TiDB."]`,
@@ -219,19 +226,19 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 	})
 
 	// single line file
-	s.writeTmpFile(c, "rpc.tidb-1.log", []string{
+	s.writeTmpFile(t, "rpc.tidb-1.log", []string{
 		`[2019/08/26 06:20:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// two lines file
-	s.writeTmpFile(c, "rpc.tidb-2.log", []string{
+	s.writeTmpFile(t, "rpc.tidb-2.log", []string{
 		`[2019/08/26 06:21:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:21:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	})
 
 	// empty file
-	s.writeTmpFile(c, "rpc.tidb-3.log", []string{``})
-	s.writeTmpFile(c, "rpc.tidb-4.log", []string{
+	s.writeTmpFile(t, "rpc.tidb-3.log", []string{``})
+	s.writeTmpFile(t, "rpc.tidb-4.log", []string{
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`This is also an invalid log contains partern ...`,
 		`[2019/08/26 06:22:14.011 -04:00] [WARN] [printer.go:41] ["Welcome to TiDB."]`,
@@ -239,7 +246,7 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 		`[2019/08/26 06:22:16.011 -04:00] [DEBUG] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:17.011 -04:00] [TRACE] [printer.go:41] ["Welcome to TiDB."]`,
 	})
-	s.writeTmpFile(c, "rpc.tidb-5.log", []string{
+	s.writeTmpFile(t, "rpc.tidb-5.log", []string{
 		`[2019/08/26 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test to TiDB."]`,
 		`[2019/08/27 06:23:14.011 -04:00] [INFO] [printer.go:41] ["partern test txn to TiDB."]`,
 	})
@@ -446,53 +453,57 @@ func (s *searchLogSuite) TestLogIterator(c *C) {
 
 	// Set up a connection to the server.
 	conn, err := grpc.Dial(s.address, grpc.WithInsecure())
-	c.Assert(err, IsNil)
+	require.NoError(t, err)
 
-	defer conn.Close()
+	defer func() {
+		require.NoError(t, conn.Close())
+	}()
 
 	for i, cas := range cases {
-		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
-		c.Assert(err, IsNil)
-		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
-		c.Assert(err, IsNil)
-		req := &pb.SearchLogRequest{
-			StartTime: beginTime,
-			EndTime:   endTime,
-			Levels:    cas.levels,
-			Patterns:  cas.patterns,
-		}
-		client := pb.NewDiagnosticsClient(conn)
-
-		// Contact the server and print out its response.
-		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
-		defer cancel()
-
-		stream, err := client.SearchLog(ctx, req)
-		c.Assert(err, IsNil)
-
-		resp := &pb.SearchLogResponse{}
-		for {
-			res, err := stream.Recv()
-			if err != nil && err == io.EOF {
-				break
+		func() {
+			beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
+			require.NoError(t, err)
+			endTime, err := sysutil.ParseTimeStamp(cas.search.end)
+			require.NoError(t, err)
+			req := &pb.SearchLogRequest{
+				StartTime: beginTime,
+				EndTime:   endTime,
+				Levels:    cas.levels,
+				Patterns:  cas.patterns,
 			}
-			c.Assert(err, IsNil)
-			c.Assert(res, NotNil)
-			resp.Messages = append(resp.Messages, res.Messages...)
-		}
+			client := pb.NewDiagnosticsClient(conn)
 
-		var items []*pb.LogMessage
-		for _, s := range cas.expect {
-			item, err := sysutil.ParseLogItem(s)
-			c.Assert(err, IsNil)
-			items = append(items, item)
-		}
-		c.Assert(len(resp.Messages), Equals, len(items), Commentf("search log (index: %d) failed", i))
-		c.Assert(resp.Messages, DeepEquals, items, Commentf("search log (index: %d) failed", i))
+			// Contact the server and print out its response.
+			ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+			defer cancel()
+
+			stream, err := client.SearchLog(ctx, req)
+			require.NoError(t, err)
+
+			resp := &pb.SearchLogResponse{}
+			for {
+				res, err := stream.Recv()
+				if err != nil && err == io.EOF {
+					break
+				}
+				require.NoError(t, err)
+				require.NotNil(t, res)
+				resp.Messages = append(resp.Messages, res.Messages...)
+			}
+
+			var items []*pb.LogMessage
+			for _, s := range cas.expect {
+				item, err := sysutil.ParseLogItem(s)
+				require.NoError(t, err)
+				items = append(items, item)
+			}
+			require.Equal(t, len(items), len(resp.Messages), fmt.Sprintf("search log (index: %d) failed", i))
+			require.Equal(t, items, resp.Messages, fmt.Sprintf("search log (index: %d) failed", i))
+		}()
 	}
 }
 
-func (s *searchLogSuite) TestParseLogLevel(c *C) {
+func TestParseLogLevel(t *testing.T) {
 	cases := []struct {
 		s string
 		l pb.LogLevel
@@ -513,11 +524,12 @@ func (s *searchLogSuite) TestParseLogLevel(c *C) {
 	}
 
 	for _, cas := range cases {
-		c.Assert(sysutil.ParseLogLevel(cas.s), Equals, cas.l, Commentf("parse %v, expected: %v, got: %v", cas.s, cas.l))
+		got := sysutil.ParseLogLevel(cas.s)
+		require.Equal(t, cas.l, got, fmt.Sprintf("parse %v, expected: %v, got: %v", cas.s, cas.l, got))
 	}
 }
 
-func (s *searchLogSuite) TestParseLogItem(c *C) {
+func TestParseLogItem(t *testing.T) {
 	cases := []struct {
 		raw     string
 		time    string
@@ -534,16 +546,19 @@ func (s *searchLogSuite) TestParseLogItem(c *C) {
 
 	for _, cas := range cases {
 		item, err := sysutil.ParseLogItem(cas.raw)
-		c.Assert(err, IsNil)
-		c.Assert(item.Level, Equals, cas.level)
-		time, err := sysutil.ParseTimeStamp(cas.time)
-		c.Assert(err, IsNil)
-		c.Assert(item.Time, Equals, time)
-		c.Assert(item.Message, Equals, cas.message)
+		require.NoError(t, err)
+		require.Equal(t, cas.level, item.Level)
+		tt, err := sysutil.ParseTimeStamp(cas.time)
+		require.NoError(t, err)
+		require.Equal(t, tt, item.Time)
+		require.Equal(t, cas.message, item.Message)
 	}
 }
 
-func (s *searchLogSuite) TestReadLastLinesHuge(c *C) {
+func TestReadLastLinesHuge(t *testing.T) {
+	s, clean := createSearchLogSuite(t)
+	defer clean()
+
 	// step 1. initial a log file with lastHugeLine
 	lastHugeLine := make([]byte, 0, 1024+512)
 	lastHugeLine = append(lastHugeLine, []byte(`[2019/08/26 06:22:20.011 -04:00] [INFO] [printer.go:41] `)...)
@@ -554,7 +569,7 @@ func (s *searchLogSuite) TestReadLastLinesHuge(c *C) {
 			lastHugeLine = append(lastHugeLine, 'a')
 		}
 	}
-	s.writeTmpFile(c, "tidb.log", []string{
+	s.writeTmpFile(t, "tidb.log", []string{
 		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		string(lastHugeLine),
 	})
@@ -562,19 +577,24 @@ func (s *searchLogSuite) TestReadLastLinesHuge(c *C) {
 	// step 2. open it as read only mode
 	path := filepath.Join(s.tmpDir, "tidb.log")
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
-	c.Assert(err, IsNil, Commentf("open file %s failed", path))
-	defer file.Close()
+	require.NoError(t, err, fmt.Sprintf("open file %s failed", path))
+	defer func() {
+		require.NoError(t, file.Close())
+	}()
 
 	stat, err := file.Stat()
-	c.Assert(err, IsNil)
+	require.NoError(t, err)
 	lastLines, _, err := sysutil.ReadLastLines(context.Background(), file, stat.Size())
-	c.Assert(err, IsNil)
-	c.Assert(len(lastLines), Equals, 4)
+	require.NoError(t, err)
+	require.Len(t, lastLines, 4)
 }
 
-func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
+func TestReadAndAppendLogFile(t *testing.T) {
+	s, clean := createSearchLogSuite(t)
+	defer clean()
+
 	// step 1. initial a log file
-	s.writeTmpFile(c, "tidb.log", []string{
+	s.writeTmpFile(t, "tidb.log", []string{
 		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -585,23 +605,26 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 	// step 2. open it as read only mode
 	path := filepath.Join(s.tmpDir, "tidb.log")
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
-	c.Assert(err, IsNil, Commentf("open file %s failed", path))
-	defer file.Close()
+	require.NoError(t, err, fmt.Sprintf("open file %s failed", path))
+	defer func() {
+		require.NoError(t, file.Close())
+	}()
 
 	stat, _ := file.Stat()
 	filesize := stat.Size()
 
 	// step 3. run a goroutine to append some new logs to the file
 	go func() {
-		file_append, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
-		c.Assert(err, IsNil, Commentf("open file as append mode %s failed", path))
-		defer file_append.Close()
+		fileAppend, err := os.OpenFile(path, os.O_APPEND|os.O_WRONLY, os.ModeAppend)
+		require.NoError(t, err, fmt.Sprintf("open file as append mode %s failed", path))
+		defer func() {
+			require.NoError(t, fileAppend.Close())
+		}()
 
 		for i := 40; i < 45; i++ {
 			line := fmt.Sprintf("[2020/07/07 06:%d:17.011 -04:00] [INFO] appended logs\n", i)
-			_, err := file_append.WriteString(line)
-			c.Assert(err, IsNil, Commentf("write %s failed", line))
-
+			_, err := fileAppend.WriteString(line)
+			require.NoError(t, err, fmt.Sprintf("write %s failed", line))
 			time.Sleep(10 * time.Millisecond)
 		}
 	}()
@@ -622,7 +645,7 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 		if readBytes == 0 {
 			break
 		}
-		c.Assert(strings.Join(lines, "\n"), Equals, expected[i], Commentf("expected: %v, got: %v", expected[i], lines))
+		require.Equal(t, expected[i], strings.Join(lines, "\n"), fmt.Sprintf("expected: %v, got: %v", expected[i], lines))
 		i++
 		endCursor -= int64(readBytes)
 
@@ -630,9 +653,12 @@ func (s *searchLogSuite) TestReadAndAppendLogFile(c *C) {
 	}
 }
 
-func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
+func BenchmarkReadLastLines(b *testing.B) {
+	s, clean := createSearchLogSuite(b)
+	defer clean()
+
 	// step 1. initial a log file
-	s.writeTmpFile(c, "tidb.log", []string{
+	s.writeTmpFile(b, "tidb.log", []string{
 		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -643,40 +669,47 @@ func (s *searchLogSuite) BenchmarkReadLastLines(c *C) {
 	// step 2. open it as read only mode
 	path := filepath.Join(s.tmpDir, "tidb.log")
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
-	c.Assert(err, IsNil, Commentf("open file %s failed", path))
-	defer file.Close()
+	require.NoError(b, err, fmt.Sprintf("open file %s failed", path))
+	defer func() {
+		require.NoError(b, file.Close())
+	}()
 
 	stat, _ := file.Stat()
 	filesize := stat.Size()
 
 	// step 3. start to benchmark
-	c.ResetTimer()
-	for i := 0; i < c.N; i++ {
-		sysutil.ReadLastLines(context.Background(), file, filesize)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = sysutil.ReadLastLines(context.Background(), file, filesize)
 	}
 }
 
-func (s *searchLogSuite) BenchmarkReadLastLinesOfHugeLine(c *C) {
+func BenchmarkReadLastLinesOfHugeLine(b *testing.B) {
+	s, clean := createSearchLogSuite(b)
+	defer clean()
+
 	// step 1. initial a huge line log file
 	hugeLine := make([]byte, 1024*1024*10)
 	for i := range hugeLine {
 		hugeLine[i] = 'a' + byte(i%26)
 	}
-	s.writeTmpFile(c, "tidb.log", []string{string(hugeLine)})
+	s.writeTmpFile(b, "tidb.log", []string{string(hugeLine)})
 
 	// step 2. open it as read only mode
 	path := filepath.Join(s.tmpDir, "tidb.log")
 	file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
-	c.Assert(err, IsNil, Commentf("open file %s failed", path))
-	defer file.Close()
+	require.NoError(b, err, fmt.Sprintf("open file %s failed", path))
+	defer func() {
+		require.NoError(b, file.Close())
+	}()
 
 	stat, _ := file.Stat()
 	filesize := stat.Size()
 
 	// step 3. start to benchmark
-	c.ResetTimer()
-	for i := 0; i < c.N; i++ {
-		sysutil.ReadLastLines(context.Background(), file, filesize)
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		_, _, _ = sysutil.ReadLastLines(context.Background(), file, filesize)
 	}
 }
 
