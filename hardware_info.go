@@ -26,6 +26,27 @@ import (
 	"github.com/shirou/gopsutil/v3/net"
 )
 
+var getMemoryCapacity func() (uint64, error)
+
+func RegisterGetMemoryCapacity(f func() (uint64, error)) {
+	getMemoryCapacity = f
+}
+
+func GetMemoryCapacity() (uint64, error) {
+	if getMemoryCapacity == nil {
+		memoryTotal, err := mem.VirtualMemory()
+		if err != nil {
+			return 0, err
+		}
+		return memoryTotal.Total, err
+	}
+	data, err := getMemoryCapacity()
+	if err != nil {
+		return 0, err
+	}
+	return data, err
+}
+
 func getHardwareInfo() []*pb.ServerInfoItem {
 	var results []*pb.ServerInfoItem
 	// cpu
@@ -49,13 +70,13 @@ func getHardwareInfo() []*pb.ServerInfoItem {
 	}
 
 	// memory
-	ms, err := mem.VirtualMemory()
+	total, err := GetMemoryCapacity()
 	if err == nil {
 		results = append(results, &pb.ServerInfoItem{
 			Tp:   "memory",
 			Name: "memory",
 			Pairs: []*pb.ServerInfoPair{
-				{Key: "capacity", Value: fmt.Sprintf("%d", ms.Total)},
+				{Key: "capacity", Value: fmt.Sprintf("%d", total)},
 			},
 		})
 	}
