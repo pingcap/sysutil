@@ -15,6 +15,7 @@
 package sysutil_test
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -30,6 +31,7 @@ import (
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/pingcap/sysutil"
 	"github.com/stretchr/testify/require"
+	"github.com/tj/assert"
 	"google.golang.org/grpc"
 )
 
@@ -651,6 +653,33 @@ func TestReadAndAppendLogFile(t *testing.T) {
 
 		time.Sleep(15 * time.Millisecond)
 	}
+}
+
+func TestCompressLog(t *testing.T) {
+	tmpDir := t.TempDir()
+
+	filename := "test.log"
+	gzf, err := os.OpenFile(filepath.Join(tmpDir, filename+".gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	assert.NoError(t, err)
+	gz := gzip.NewWriter(gzf)
+	gz.Write([]byte(strings.Join([]string{
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	}, "\n")))
+	assert.NoError(t, err)
+	gz.Close()
+
+	beginTime, err := sysutil.ParseTimeStamp("2019/08/26 06:22:14.000 -04:00")
+	assert.NoError(t, err)
+	endTime, err := sysutil.ParseTimeStamp("2019/08/26 06:22:16.000 -04:00")
+	assert.NoError(t, err)
+
+	logfile, err := sysutil.ResolveFiles(context.Background(), filepath.Join(tmpDir, filename), beginTime, endTime)
+	assert.NoError(t, err)
+	assert.NotNil(t, logfile)
 }
 
 func BenchmarkReadLastLines(b *testing.B) {
