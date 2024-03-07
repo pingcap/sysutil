@@ -405,20 +405,27 @@ func (iter *logIterator) close() {
 	}
 }
 
+func (iter *logIterator) updateToNextReader() error {
+	if !iter.pending[iter.fileIndex].compressed {
+		iter.reader = bufio.NewReader(iter.pending[iter.fileIndex].file)
+	} else {
+		gr, err := gzip.NewReader(iter.pending[iter.fileIndex].file)
+		if err != nil {
+			return err
+		}
+		iter.reader = bufio.NewReader(gr)
+	}
+	return nil
+}
+
 func (iter *logIterator) next(ctx context.Context) (*pb.LogMessage, error) {
 	// initial state
 	if iter.reader == nil {
 		if len(iter.pending) == 0 {
 			return nil, io.EOF
 		}
-		if !iter.pending[iter.fileIndex].compressed {
-			iter.reader = bufio.NewReader(iter.pending[iter.fileIndex].file)
-		} else {
-			gr, err := gzip.NewReader(iter.pending[iter.fileIndex].file)
-			if err != nil {
-				return nil, err
-			}
-			iter.reader = bufio.NewReader(gr)
+		if err := iter.updateToNextReader(); err != nil {
+			return nil, err
 		}
 	}
 
@@ -434,14 +441,8 @@ nextLine:
 			if iter.fileIndex >= len(iter.pending) {
 				return nil, io.EOF
 			}
-			if !iter.pending[iter.fileIndex].compressed {
-				iter.reader.Reset(iter.pending[iter.fileIndex].file)
-			} else {
-				gr, err := gzip.NewReader(iter.pending[iter.fileIndex].file)
-				if err != nil {
-					return nil, err
-				}
-				iter.reader.Reset(gr)
+			if err := iter.updateToNextReader(); err != nil {
+				return nil, err
 			}
 			continue
 		}
