@@ -119,7 +119,8 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 			}
 			lastItemTime = lastItem.Time
 		} else {
-			// for compressed file, to avoid decompression, we assume lastTime equals to inf.
+			// For compressed file, it's hard to get last item,
+			// and to avoid decompression, we assume lastTime equals to `math.MaxInt64`.
 			lastItemTime = math.MaxInt64
 		}
 		// Reset position to the start and skip this file if cannot seek to start
