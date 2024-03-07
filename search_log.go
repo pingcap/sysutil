@@ -464,6 +464,7 @@ nextLine:
 		} else {
 			iter.preLog = item
 		}
+		// It assumes no time range overlap for log files.
 		if item.Time > iter.end {
 			return nil, io.EOF
 		}
