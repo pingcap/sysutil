@@ -16,11 +16,12 @@ package sysutil
 
 import (
 	"bufio"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -44,6 +45,8 @@ func (l *logFile) EndTime() int64 {
 	return l.end
 }
 
+const compressSuffix = ".gz"
+
 func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime int64) ([]logFile, error) {
 	if logFilePath == "" {
 		return nil, errors.New("empty log file location configuration")
@@ -54,17 +57,22 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 	logDir := filepath.Dir(logFilePath)
 	ext := filepath.Ext(logFilePath)
 	filePrefix := logFilePath[:len(logFilePath)-len(ext)]
-	files, err := ioutil.ReadDir(logDir)
+	files, err := os.ReadDir(logDir)
 	if err != nil {
 		return nil, err
 	}
-	walkFn := func(path string, info os.FileInfo) error {
+	walkFn := func(path string, info os.DirEntry) error {
 		if info.IsDir() {
 			return nil
 		}
 		// All rotated log files have the same prefix and extension with the original file
 		if !strings.HasPrefix(path, filePrefix) {
 			return nil
+		}
+		compressed := false
+		if strings.HasSuffix(path, compressSuffix) {
+			compressed = true
+			path = path[0 : len(path)-len(compressSuffix)]
 		}
 		if !strings.HasSuffix(path, ext) {
 			return nil
@@ -75,37 +83,58 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		// If we cannot open the file, we skip to search the file instead of returning
 		// error and abort entire searching task.
 		// TODO: do we need to return some warning to client?
-		file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+		var file *os.File
+		if !compressed {
+			file, err = os.OpenFile(path, os.O_RDONLY, os.ModePerm)
+		} else {
+			file, err = os.OpenFile(path+compressSuffix, os.O_RDONLY, os.ModePerm)
+		}
 		if err != nil {
 			return nil
 		}
-		reader := bufio.NewReader(file)
+		var reader *bufio.Reader
+		if !compressed {
+			reader = bufio.NewReader(file)
+		} else {
+			gr, err := gzip.NewReader(file)
+			if err != nil {
+				return nil
+			}
+			reader = bufio.NewReader(gr)
+		}
 
+		var firstItemTime, lastItemTime int64
 		firstItem, err := readFirstValidLog(ctx, reader, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
+		firstItemTime = firstItem.Time
 
-		lastItem, err := readLastValidLog(ctx, file, 10)
-		if err != nil {
-			skipFiles = append(skipFiles, file)
-			return nil
+		if !compressed {
+			lastItem, err := readLastValidLog(ctx, file, 10)
+			if err != nil {
+				skipFiles = append(skipFiles, file)
+				return nil
+			}
+			lastItemTime = lastItem.Time
+		} else {
+			// for compressed file, to avoid decompression, we assume lastTime equals to inf.
+			lastItemTime = math.MaxInt64
 		}
-
 		// Reset position to the start and skip this file if cannot seek to start
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
 
-		if beginTime > lastItem.Time || endTime < firstItem.Time {
+		if beginTime > lastItemTime || endTime < firstItemTime {
 			skipFiles = append(skipFiles, file)
 		} else {
 			logFiles = append(logFiles, logFile{
 				file:  file,
-				begin: firstItem.Time,
-				end:   lastItem.Time,
+				begin: firstItemTime,
+				end:   lastItemTime,
 			})
 		}
 		return nil
@@ -127,7 +156,22 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 	sort.Slice(logFiles, func(i, j int) bool {
 		return logFiles[i].begin < logFiles[j].begin
 	})
-	return logFiles, err
+
+	// Assume no time range overlap in log files and remove unnecessary log files for compressed files.
+	// When logFiles[i-1].end < begin < logFiles[i].begin, it will return one more logFiles[i-1].
+	idx := 0
+	for i := range logFiles {
+		if i == 0 {
+			continue
+		}
+		if logFiles[i].begin < beginTime {
+			idx = i
+			skipFiles = append(skipFiles, logFiles[i-1].file)
+		} else {
+			break
+		}
+	}
+	return logFiles[idx:], err
 }
 
 func isCtxDone(ctx context.Context) bool {

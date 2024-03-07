@@ -31,7 +31,6 @@ import (
 	pb "github.com/pingcap/kvproto/pkg/diagnosticspb"
 	"github.com/pingcap/sysutil"
 	"github.com/stretchr/testify/require"
-	"github.com/tj/assert"
 	"google.golang.org/grpc"
 )
 
@@ -658,10 +657,21 @@ func TestReadAndAppendLogFile(t *testing.T) {
 func TestCompressLog(t *testing.T) {
 	tmpDir := t.TempDir()
 
-	filename := "test.log"
-	gzf, err := os.OpenFile(filepath.Join(tmpDir, filename+".gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
-	assert.NoError(t, err)
+	gzf, err := os.OpenFile(filepath.Join(tmpDir, "test-2.log.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	require.NoError(t, err)
 	gz := gzip.NewWriter(gzf)
+	gz.Write([]byte(strings.Join([]string{
+		`[2019/08/26 06:22:08.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:09.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:10.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:11.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:12.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	}, "\n")))
+	gz.Close()
+
+	gzf, err = os.OpenFile(filepath.Join(tmpDir, "test-1.log.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	require.NoError(t, err)
+	gz = gzip.NewWriter(gzf)
 	gz.Write([]byte(strings.Join([]string{
 		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
@@ -669,17 +679,112 @@ func TestCompressLog(t *testing.T) {
 		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 	}, "\n")))
-	assert.NoError(t, err)
 	gz.Close()
 
-	beginTime, err := sysutil.ParseTimeStamp("2019/08/26 06:22:14.000 -04:00")
-	assert.NoError(t, err)
-	endTime, err := sysutil.ParseTimeStamp("2019/08/26 06:22:16.000 -04:00")
-	assert.NoError(t, err)
+	f, err := os.OpenFile(filepath.Join(tmpDir, "test.log"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	require.NoError(t, err)
+	f.Write([]byte(strings.Join([]string{
+		`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:20.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:21.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:22.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	}, "\n")))
+	f.Close()
 
-	logfile, err := sysutil.ResolveFiles(context.Background(), filepath.Join(tmpDir, filename), beginTime, endTime)
-	assert.NoError(t, err)
-	assert.NotNil(t, logfile)
+	type timeRange struct{ start, end string }
+	cases := []struct {
+		search        timeRange
+		expectFileNum int
+		expect        []string
+		levels        []pb.LogLevel
+		patterns      []string
+	}{
+		{
+			search:        timeRange{"2019/08/26 06:22:14.000 -04:00", "2019/08/26 06:22:16.000 -04:00"},
+			expectFileNum: 1,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			search:        timeRange{"2019/08/26 06:22:10.000 -04:00", "2019/08/26 06:22:16.000 -04:00"},
+			expectFileNum: 2,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:10.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:11.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:12.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			search:        timeRange{"2019/08/26 06:22:14.000 -04:00", "2019/08/26 06:22:20.000 -04:00"},
+			expectFileNum: 2,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			search:        timeRange{"2019/08/26 06:22:10.000 -04:00", "2019/08/26 06:22:20.000 -04:00"},
+			expectFileNum: 3,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:10.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:11.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:12.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			// When file1.endtime < search.start < file2.begintime,
+			// it will scan one more file, because we don't now the last item for a compressed file.
+			search:        timeRange{"2019/08/26 06:22:13.000 -04:00", "2019/08/26 06:22:20.000 -04:00"},
+			expectFileNum: 3,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+	}
+
+	for _, cas := range cases {
+		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
+		require.NoError(t, err)
+		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
+		require.NoError(t, err)
+
+		logfile, err := sysutil.ResolveFiles(context.Background(), filepath.Join(tmpDir, "test.log"), beginTime, endTime)
+		require.NoError(t, err)
+		require.Len(t, logfile, cas.expectFileNum)
+	}
 }
 
 func BenchmarkReadLastLines(b *testing.B) {
