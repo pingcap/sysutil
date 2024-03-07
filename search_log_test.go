@@ -73,6 +73,15 @@ func (s *searchLogSuite) writeTmpFile(t testing.TB, filename string, lines []str
 	require.NoError(t, err, fmt.Sprintf("write tmp file %s failed", filename))
 }
 
+func (s *searchLogSuite) writeTmpGzipFile(t testing.TB, filename string, lines []string) {
+	gzf, err := os.OpenFile(filepath.Join(s.tmpDir, filename), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	require.NoError(t, err, fmt.Sprintf("write tmp gzip file %s failed", filename))
+	gz := gzip.NewWriter(gzf)
+	defer gz.Close()
+	_, err = gz.Write([]byte(strings.Join(lines, "\n")))
+	require.NoError(t, err, fmt.Sprintf("write tmp gzip file %s failed", filename))
+}
+
 func TestResolveFiles(t *testing.T) {
 	s, clean := createSearchLogSuite(t)
 	defer clean()
@@ -655,42 +664,32 @@ func TestReadAndAppendLogFile(t *testing.T) {
 }
 
 func TestCompressLog(t *testing.T) {
-	tmpDir := t.TempDir()
+	s, clean := createSearchLogSuite(t)
+	defer clean()
 
-	gzf, err := os.OpenFile(filepath.Join(tmpDir, "test-2.log.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
-	require.NoError(t, err)
-	gz := gzip.NewWriter(gzf)
-	gz.Write([]byte(strings.Join([]string{
+	s.writeTmpGzipFile(t, "rpc.tidb-2.log.gz", []string{
 		`[2019/08/26 06:22:08.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:09.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:10.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:11.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:12.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
-	}, "\n")))
-	gz.Close()
+	})
 
-	gzf, err = os.OpenFile(filepath.Join(tmpDir, "test-1.log.gz"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
-	require.NoError(t, err)
-	gz = gzip.NewWriter(gzf)
-	gz.Write([]byte(strings.Join([]string{
+	s.writeTmpGzipFile(t, "rpc.tidb-1.log.gz", []string{
 		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
-	}, "\n")))
-	gz.Close()
+	})
 
-	f, err := os.OpenFile(filepath.Join(tmpDir, "test.log"), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
-	require.NoError(t, err)
-	f.Write([]byte(strings.Join([]string{
+	s.writeTmpFile(t, "rpc.tidb.log", []string{
 		`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:20.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:21.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
 		`[2019/08/26 06:22:22.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
-	}, "\n")))
-	f.Close()
+	})
 
 	type timeRange struct{ start, end string }
 	cases := []struct {
@@ -775,15 +774,54 @@ func TestCompressLog(t *testing.T) {
 		},
 	}
 
-	for _, cas := range cases {
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(s.address, grpc.WithInsecure())
+	require.NoError(t, err)
+
+	for i, cas := range cases {
 		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
 		require.NoError(t, err)
 		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
 		require.NoError(t, err)
 
-		logfile, err := sysutil.ResolveFiles(context.Background(), filepath.Join(tmpDir, "test.log"), beginTime, endTime)
+		logfile, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "rpc.tidb.log"), beginTime, endTime)
 		require.NoError(t, err)
 		require.Len(t, logfile, cas.expectFileNum)
+
+		req := &pb.SearchLogRequest{
+			StartTime: beginTime,
+			EndTime:   endTime,
+			Levels:    cas.levels,
+			Patterns:  cas.patterns,
+		}
+		client := pb.NewDiagnosticsClient(conn)
+
+		// Contact the server and print out its response.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		stream, err := client.SearchLog(ctx, req)
+		require.NoError(t, err)
+
+		resp := &pb.SearchLogResponse{}
+		for {
+			res, err := stream.Recv()
+			if err != nil && err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			resp.Messages = append(resp.Messages, res.Messages...)
+		}
+
+		var items []*pb.LogMessage
+		for _, s := range cas.expect {
+			item, err := sysutil.ParseLogItem(s)
+			require.NoError(t, err)
+			items = append(items, item)
+		}
+		require.Equal(t, len(items), len(resp.Messages), fmt.Sprintf("search log (index: %d) failed", i))
+		require.Equal(t, items, resp.Messages, fmt.Sprintf("search log (index: %d) failed", i))
 	}
 }
 

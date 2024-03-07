@@ -35,6 +35,7 @@ import (
 type logFile struct {
 	file       *os.File // The opened file handle
 	begin, end int64    // The timesteamp in millisecond of first line
+	compressed bool     // The file is compressed or not
 }
 
 func (l *logFile) BeginTime() int64 {
@@ -133,9 +134,10 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 			skipFiles = append(skipFiles, file)
 		} else {
 			logFiles = append(logFiles, logFile{
-				file:  file,
-				begin: firstItemTime,
-				end:   lastItemTime,
+				file:       file,
+				begin:      firstItemTime,
+				end:        lastItemTime,
+				compressed: compressed,
 			})
 		}
 		return nil
@@ -392,14 +394,14 @@ type logIterator struct {
 	// inner state
 	fileIndex int
 	reader    *bufio.Reader
-	pending   []*os.File
+	pending   []logFile
 	preLog    *pb.LogMessage
 }
 
 // The Close method close all resources the iterator has.
 func (iter *logIterator) close() {
 	for _, f := range iter.pending {
-		_ = f.Close()
+		_ = f.file.Close()
 	}
 }
 
@@ -409,7 +411,15 @@ func (iter *logIterator) next(ctx context.Context) (*pb.LogMessage, error) {
 		if len(iter.pending) == 0 {
 			return nil, io.EOF
 		}
-		iter.reader = bufio.NewReader(iter.pending[iter.fileIndex])
+		if !iter.pending[iter.fileIndex].compressed {
+			iter.reader = bufio.NewReader(iter.pending[iter.fileIndex].file)
+		} else {
+			gr, err := gzip.NewReader(iter.pending[iter.fileIndex].file)
+			if err != nil {
+				return nil, err
+			}
+			iter.reader = bufio.NewReader(gr)
+		}
 	}
 
 nextLine:
@@ -424,7 +434,15 @@ nextLine:
 			if iter.fileIndex >= len(iter.pending) {
 				return nil, io.EOF
 			}
-			iter.reader.Reset(iter.pending[iter.fileIndex])
+			if !iter.pending[iter.fileIndex].compressed {
+				iter.reader.Reset(iter.pending[iter.fileIndex].file)
+			} else {
+				gr, err := gzip.NewReader(iter.pending[iter.fileIndex].file)
+				if err != nil {
+					return nil, err
+				}
+				iter.reader.Reset(gr)
+			}
 			continue
 		}
 		line = strings.TrimSpace(line)
