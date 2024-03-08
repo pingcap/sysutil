@@ -70,12 +70,8 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		if !strings.HasPrefix(path, filePrefix) {
 			return nil
 		}
-		compressed := false
-		if strings.HasSuffix(path, compressSuffix) {
-			compressed = true
-			path = path[0 : len(path)-len(compressSuffix)]
-		}
-		if !strings.HasSuffix(path, ext) {
+		compressed := strings.HasSuffix(path, compressSuffix)
+		if !strings.HasSuffix(path, ext) && !strings.HasSuffix(path, ext+compressSuffix) {
 			return nil
 		}
 		if isCtxDone(ctx) {
@@ -84,12 +80,7 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		// If we cannot open the file, we skip to search the file instead of returning
 		// error and abort entire searching task.
 		// TODO: do we need to return some warning to client?
-		var file *os.File
-		if !compressed {
-			file, err = os.OpenFile(path, os.O_RDONLY, os.ModePerm)
-		} else {
-			file, err = os.OpenFile(path+compressSuffix, os.O_RDONLY, os.ModePerm)
-		}
+		file, err := os.OpenFile(path, os.O_RDONLY, os.ModePerm)
 		if err != nil {
 			return nil
 		}
