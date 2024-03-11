@@ -16,11 +16,12 @@ package sysutil
 
 import (
 	"bufio"
+	"compress/gzip"
 	"context"
 	"errors"
 	"fmt"
 	"io"
-	"io/ioutil"
+	"math"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -34,6 +35,7 @@ import (
 type logFile struct {
 	file       *os.File // The opened file handle
 	begin, end int64    // The timesteamp in millisecond of first line
+	compressed bool     // The file is compressed or not
 }
 
 func (l *logFile) BeginTime() int64 {
@@ -43,6 +45,8 @@ func (l *logFile) BeginTime() int64 {
 func (l *logFile) EndTime() int64 {
 	return l.end
 }
+
+const compressSuffix = ".gz"
 
 func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime int64) ([]logFile, error) {
 	if logFilePath == "" {
@@ -54,11 +58,11 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 	logDir := filepath.Dir(logFilePath)
 	ext := filepath.Ext(logFilePath)
 	filePrefix := logFilePath[:len(logFilePath)-len(ext)]
-	files, err := ioutil.ReadDir(logDir)
+	files, err := os.ReadDir(logDir)
 	if err != nil {
 		return nil, err
 	}
-	walkFn := func(path string, info os.FileInfo) error {
+	walkFn := func(path string, info os.DirEntry) error {
 		if info.IsDir() {
 			return nil
 		}
@@ -66,7 +70,8 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		if !strings.HasPrefix(path, filePrefix) {
 			return nil
 		}
-		if !strings.HasSuffix(path, ext) {
+		compressed := strings.HasSuffix(path, compressSuffix)
+		if !strings.HasSuffix(path, ext) && !strings.HasSuffix(path, ext+compressSuffix) {
 			return nil
 		}
 		if isCtxDone(ctx) {
@@ -79,33 +84,51 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 		if err != nil {
 			return nil
 		}
-		reader := bufio.NewReader(file)
+		var reader *bufio.Reader
+		if !compressed {
+			reader = bufio.NewReader(file)
+		} else {
+			gr, err := gzip.NewReader(file)
+			if err != nil {
+				return nil
+			}
+			reader = bufio.NewReader(gr)
+		}
 
+		var firstItemTime, lastItemTime int64
 		firstItem, err := readFirstValidLog(ctx, reader, 10)
 		if err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
+		firstItemTime = firstItem.Time
 
-		lastItem, err := readLastValidLog(ctx, file, 10)
-		if err != nil {
-			skipFiles = append(skipFiles, file)
-			return nil
+		if !compressed {
+			lastItem, err := readLastValidLog(ctx, file, 10)
+			if err != nil {
+				skipFiles = append(skipFiles, file)
+				return nil
+			}
+			lastItemTime = lastItem.Time
+		} else {
+			// For compressed file, it's hard to get last item,
+			// and to avoid decompression, we assume lastTime equals to `math.MaxInt64`.
+			lastItemTime = math.MaxInt64
 		}
-
 		// Reset position to the start and skip this file if cannot seek to start
 		if _, err := file.Seek(0, io.SeekStart); err != nil {
 			skipFiles = append(skipFiles, file)
 			return nil
 		}
 
-		if beginTime > lastItem.Time || endTime < firstItem.Time {
+		if beginTime > lastItemTime || endTime < firstItemTime {
 			skipFiles = append(skipFiles, file)
 		} else {
 			logFiles = append(logFiles, logFile{
-				file:  file,
-				begin: firstItem.Time,
-				end:   lastItem.Time,
+				file:       file,
+				begin:      firstItemTime,
+				end:        lastItemTime,
+				compressed: compressed,
 			})
 		}
 		return nil
@@ -127,7 +150,22 @@ func resolveFiles(ctx context.Context, logFilePath string, beginTime, endTime in
 	sort.Slice(logFiles, func(i, j int) bool {
 		return logFiles[i].begin < logFiles[j].begin
 	})
-	return logFiles, err
+
+	// Assume no time range overlap in log files and remove unnecessary log files for compressed files.
+	// When logFiles[i-1].end < begin < logFiles[i].begin, it will return one more logFiles[i-1].
+	idx := 0
+	for i := range logFiles {
+		if i == 0 {
+			continue
+		}
+		if logFiles[i].begin < beginTime {
+			idx = i
+			skipFiles = append(skipFiles, logFiles[i-1].file)
+		} else {
+			break
+		}
+	}
+	return logFiles[idx:], err
 }
 
 func isCtxDone(ctx context.Context) bool {
@@ -347,15 +385,28 @@ type logIterator struct {
 	// inner state
 	fileIndex int
 	reader    *bufio.Reader
-	pending   []*os.File
+	pending   []logFile
 	preLog    *pb.LogMessage
 }
 
 // The Close method close all resources the iterator has.
 func (iter *logIterator) close() {
 	for _, f := range iter.pending {
-		_ = f.Close()
+		_ = f.file.Close()
 	}
+}
+
+func (iter *logIterator) updateToNextReader() error {
+	if !iter.pending[iter.fileIndex].compressed {
+		iter.reader = bufio.NewReader(iter.pending[iter.fileIndex].file)
+	} else {
+		gr, err := gzip.NewReader(iter.pending[iter.fileIndex].file)
+		if err != nil {
+			return err
+		}
+		iter.reader = bufio.NewReader(gr)
+	}
+	return nil
 }
 
 func (iter *logIterator) next(ctx context.Context) (*pb.LogMessage, error) {
@@ -364,7 +415,9 @@ func (iter *logIterator) next(ctx context.Context) (*pb.LogMessage, error) {
 		if len(iter.pending) == 0 {
 			return nil, io.EOF
 		}
-		iter.reader = bufio.NewReader(iter.pending[iter.fileIndex])
+		if err := iter.updateToNextReader(); err != nil {
+			return nil, err
+		}
 	}
 
 nextLine:
@@ -379,7 +432,9 @@ nextLine:
 			if iter.fileIndex >= len(iter.pending) {
 				return nil, io.EOF
 			}
-			iter.reader.Reset(iter.pending[iter.fileIndex])
+			if err := iter.updateToNextReader(); err != nil {
+				return nil, err
+			}
 			continue
 		}
 		line = strings.TrimSpace(line)
@@ -401,6 +456,7 @@ nextLine:
 		} else {
 			iter.preLog = item
 		}
+		// It assumes no time range overlap for log files.
 		if item.Time > iter.end {
 			return nil, io.EOF
 		}

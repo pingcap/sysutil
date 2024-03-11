@@ -19,7 +19,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"os"
 	"regexp"
 	"runtime"
 	"sort"
@@ -62,11 +61,6 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 		return err
 	}
 
-	// Sort log files by start time
-	var searchFiles []*os.File
-	for _, f := range logFiles {
-		searchFiles = append(searchFiles, f.file)
-	}
 	var levelFlag int64
 	for _, l := range req.Levels {
 		levelFlag |= 1 << l
@@ -84,7 +78,7 @@ func (d *DiagnosticsServer) SearchLog(req *pb.SearchLogRequest, stream pb.Diagno
 		end:       endTime,
 		levelFlag: levelFlag,
 		patterns:  patterns,
-		pending:   searchFiles,
+		pending:   logFiles,
 	}
 	defer iter.close()
 

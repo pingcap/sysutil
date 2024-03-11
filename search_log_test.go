@@ -15,6 +15,7 @@
 package sysutil_test
 
 import (
+	"compress/gzip"
 	"context"
 	"fmt"
 	"io"
@@ -70,6 +71,15 @@ func createSearchLogSuite(t testing.TB) (*searchLogSuite, func()) {
 func (s *searchLogSuite) writeTmpFile(t testing.TB, filename string, lines []string) {
 	err := ioutil.WriteFile(filepath.Join(s.tmpDir, filename), []byte(strings.Join(lines, "\n")), os.ModePerm)
 	require.NoError(t, err, fmt.Sprintf("write tmp file %s failed", filename))
+}
+
+func (s *searchLogSuite) writeTmpGzipFile(t testing.TB, filename string, lines []string) {
+	gzf, err := os.OpenFile(filepath.Join(s.tmpDir, filename), os.O_CREATE|os.O_TRUNC|os.O_WRONLY, os.ModePerm)
+	require.NoError(t, err, fmt.Sprintf("write tmp gzip file %s failed", filename))
+	gz := gzip.NewWriter(gzf)
+	defer gz.Close()
+	_, err = gz.Write([]byte(strings.Join(lines, "\n")))
+	require.NoError(t, err, fmt.Sprintf("write tmp gzip file %s failed", filename))
 }
 
 func TestResolveFiles(t *testing.T) {
@@ -650,6 +660,168 @@ func TestReadAndAppendLogFile(t *testing.T) {
 		endCursor -= int64(readBytes)
 
 		time.Sleep(15 * time.Millisecond)
+	}
+}
+
+func TestCompressLog(t *testing.T) {
+	s, clean := createSearchLogSuite(t)
+	defer clean()
+
+	s.writeTmpGzipFile(t, "rpc.tidb-2.log.gz", []string{
+		`[2019/08/26 06:22:08.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:09.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:10.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:11.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:12.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	})
+
+	s.writeTmpGzipFile(t, "rpc.tidb-1.log.gz", []string{
+		`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	})
+
+	s.writeTmpFile(t, "rpc.tidb.log", []string{
+		`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:20.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:21.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+		`[2019/08/26 06:22:22.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+	})
+
+	type timeRange struct{ start, end string }
+	cases := []struct {
+		search        timeRange
+		expectFileNum int
+		expect        []string
+		levels        []pb.LogLevel
+		patterns      []string
+	}{
+		{
+			search:        timeRange{"2019/08/26 06:22:14.000 -04:00", "2019/08/26 06:22:16.000 -04:00"},
+			expectFileNum: 1,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			search:        timeRange{"2019/08/26 06:22:10.000 -04:00", "2019/08/26 06:22:16.000 -04:00"},
+			expectFileNum: 2,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:10.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:11.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:12.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			search:        timeRange{"2019/08/26 06:22:14.000 -04:00", "2019/08/26 06:22:20.000 -04:00"},
+			expectFileNum: 2,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			search:        timeRange{"2019/08/26 06:22:10.000 -04:00", "2019/08/26 06:22:20.000 -04:00"},
+			expectFileNum: 3,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:10.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:11.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:12.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+		{
+			// When file1.endtime < search.start < file2.begintime,
+			// it will scan one more file, because we don't now the last item for a compressed file.
+			search:        timeRange{"2019/08/26 06:22:13.000 -04:00", "2019/08/26 06:22:20.000 -04:00"},
+			expectFileNum: 3,
+			levels:        []pb.LogLevel{pb.LogLevel_Info},
+			patterns:      []string{".*TiDB.*"},
+			expect: []string{
+				`[2019/08/26 06:22:13.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:14.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:15.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:16.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:17.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:18.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+				`[2019/08/26 06:22:19.011 -04:00] [INFO] [printer.go:41] ["Welcome to TiDB."]`,
+			},
+		},
+	}
+
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(s.address, grpc.WithInsecure())
+	require.NoError(t, err)
+
+	for i, cas := range cases {
+		beginTime, err := sysutil.ParseTimeStamp(cas.search.start)
+		require.NoError(t, err)
+		endTime, err := sysutil.ParseTimeStamp(cas.search.end)
+		require.NoError(t, err)
+
+		logfile, err := sysutil.ResolveFiles(context.Background(), filepath.Join(s.tmpDir, "rpc.tidb.log"), beginTime, endTime)
+		require.NoError(t, err)
+		require.Len(t, logfile, cas.expectFileNum)
+
+		req := &pb.SearchLogRequest{
+			StartTime: beginTime,
+			EndTime:   endTime,
+			Levels:    cas.levels,
+			Patterns:  cas.patterns,
+		}
+		client := pb.NewDiagnosticsClient(conn)
+
+		// Contact the server and print out its response.
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+
+		stream, err := client.SearchLog(ctx, req)
+		require.NoError(t, err)
+
+		resp := &pb.SearchLogResponse{}
+		for {
+			res, err := stream.Recv()
+			if err != nil && err == io.EOF {
+				break
+			}
+			require.NoError(t, err)
+			require.NotNil(t, res)
+			resp.Messages = append(resp.Messages, res.Messages...)
+		}
+
+		var items []*pb.LogMessage
+		for _, s := range cas.expect {
+			item, err := sysutil.ParseLogItem(s)
+			require.NoError(t, err)
+			items = append(items, item)
+		}
+		require.Equal(t, len(items), len(resp.Messages), fmt.Sprintf("search log (index: %d) failed", i))
+		require.Equal(t, items, resp.Messages, fmt.Sprintf("search log (index: %d) failed", i))
 	}
 }
 

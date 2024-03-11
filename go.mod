@@ -14,4 +14,5 @@ require (
 	golang.org/x/tools v0.0.0-20191108193012-7d206e10da11 // indirect
 	google.golang.org/grpc v1.25.1
 	gopkg.in/yaml.v2 v2.2.4 // indirect
+	gopkg.in/yaml.v3 v3.0.0-20200605160147-a5ece683394c // indirect
 )
