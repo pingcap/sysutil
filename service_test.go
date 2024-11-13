@@ -46,12 +46,15 @@ func createServiceSuite(t *testing.T) (*serviceSuite, func()) {
 	s.server = server
 	s.address = fmt.Sprintf(":%d", listener.Addr().(*net.TCPAddr).Port)
 
+	wait := make(chan struct{})
 	go func() {
+		wait <- struct{}{}
 		if err := server.Serve(listener); err != nil {
 			log.Fatalf("failed to serve: %v", err)
 		}
 	}()
 
+	<-wait
 	return s, func() {
 		s.server.Stop()
 	}
